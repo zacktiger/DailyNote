@@ -33,9 +33,6 @@ That is a deliberate trade — E2EE would permanently rule out search and AI fea
 server. The whole server is open source and self-hostable, which is our substitute for "trust
 us". See [ADR 0002](docs/adr/0002-no-end-to-end-encryption.md).
 
-**We do not connect to Apple Notes or Google Keep.** No such API exists.
-See [ADR 0003](docs/adr/0003-no-notes-app-integrations.md).
-
 ## Layout
 
 ```
