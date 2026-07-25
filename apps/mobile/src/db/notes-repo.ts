@@ -1,0 +1,181 @@
+import type { Note } from '@dailynote/core';
+import { createNote, editBody } from '@dailynote/core';
+import * as Crypto from 'expo-crypto';
+import type { SQLiteDatabase } from 'expo-sqlite';
+
+/**
+ * All note persistence goes through here.
+ *
+ * This interface exists because the storage decision (plan section 0.2 --
+ * Legend-State key-value blobs vs. real SQLite tables) is still open pending the
+ * spike. Every read path in the app is one of these five methods, so switching
+ * the implementation later means rewriting this file and nothing else.
+ */
+export interface NotesRepo {
+  all(): Promise<Note[]>;
+  get(id: string): Promise<Note | null>;
+  create(body: string, options?: CreateOptions): Promise<Note>;
+  update(id: string, patch: Partial<Note>): Promise<void>;
+  setBody(id: string, body: string): Promise<Note | null>;
+  softDelete(id: string): Promise<void>;
+  restore(id: string): Promise<void>;
+}
+
+export interface CreateOptions {
+  source?: Note['source'];
+  sourceRef?: string | null;
+  localOnly?: boolean;
+  rootId?: string;
+  parentId?: string | null;
+  kind?: Note['kind'];
+}
+
+/** Client-generated UUIDs: offline-safe, and public URLs need no remap later. */
+export function newId(): string {
+  return Crypto.randomUUID();
+}
+
+interface NoteRow {
+  id: string;
+  user_id: string | null;
+  body: string;
+  title: string | null;
+  root_id: string;
+  parent_id: string | null;
+  kind: string;
+  next_review_at: string | null;
+  review_interval: number | null;
+  review_count: number;
+  archived_at: string | null;
+  completed_at: string | null;
+  source: string;
+  source_ref: string | null;
+  visibility: string;
+  published_at: string | null;
+  local_only: number;
+  created_at: string;
+  updated_at: string;
+  deleted: number;
+}
+
+function toNote(row: NoteRow): Note {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    body: row.body,
+    title: row.title,
+    rootId: row.root_id,
+    parentId: row.parent_id,
+    kind: row.kind as Note['kind'],
+    nextReviewAt: row.next_review_at,
+    reviewInterval: row.review_interval,
+    reviewCount: row.review_count,
+    archivedAt: row.archived_at,
+    completedAt: row.completed_at,
+    source: row.source as Note['source'],
+    sourceRef: row.source_ref,
+    visibility: row.visibility as Note['visibility'],
+    publishedAt: row.published_at,
+    localOnly: row.local_only === 1,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    deleted: row.deleted === 1,
+  };
+}
+
+/** camelCase note field -> snake_case column. The only place the mapping lives. */
+const COLUMNS: Record<keyof Note, string> = {
+  id: 'id',
+  userId: 'user_id',
+  body: 'body',
+  title: 'title',
+  rootId: 'root_id',
+  parentId: 'parent_id',
+  kind: 'kind',
+  nextReviewAt: 'next_review_at',
+  reviewInterval: 'review_interval',
+  reviewCount: 'review_count',
+  archivedAt: 'archived_at',
+  completedAt: 'completed_at',
+  source: 'source',
+  sourceRef: 'source_ref',
+  visibility: 'visibility',
+  publishedAt: 'published_at',
+  localOnly: 'local_only',
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  deleted: 'deleted',
+};
+
+function toColumnValue(value: unknown): string | number | null {
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  if (value === undefined) return null;
+  return value as string | number | null;
+}
+
+export function createNotesRepo(db: SQLiteDatabase): NotesRepo {
+  return {
+    async all() {
+      const rows = await db.getAllAsync<NoteRow>(
+        'select * from notes where deleted = 0 order by updated_at desc',
+      );
+      return rows.map(toNote);
+    },
+
+    async get(id) {
+      const row = await db.getFirstAsync<NoteRow>('select * from notes where id = ?', id);
+      return row ? toNote(row) : null;
+    },
+
+    async create(body, options = {}) {
+      const note = createNote({ id: newId(), body, ...options }, new Date());
+
+      const keys = Object.keys(COLUMNS) as (keyof Note)[];
+      const columns = keys.map((key) => COLUMNS[key]).join(', ');
+      const placeholders = keys.map(() => '?').join(', ');
+      const values = keys.map((key) => toColumnValue(note[key]));
+
+      await db.runAsync(`insert into notes (${columns}) values (${placeholders})`, values);
+      return note;
+    },
+
+    async update(id, patch) {
+      const keys = (Object.keys(patch) as (keyof Note)[]).filter(
+        (key) => key !== 'id' && key in COLUMNS,
+      );
+      if (keys.length === 0) return;
+
+      // updated_at is maintained here rather than by a trigger so a single write
+      // stays a single statement; the server trigger is the authority once
+      // sync lands (Phase 4).
+      const withTimestamp: (keyof Note)[] = keys.includes('updatedAt')
+        ? keys
+        : [...keys, 'updatedAt'];
+      const values = withTimestamp.map((key) =>
+        key === 'updatedAt' && !keys.includes('updatedAt')
+          ? new Date().toISOString()
+          : toColumnValue(patch[key]),
+      );
+
+      const assignments = withTimestamp.map((key) => `${COLUMNS[key]} = ?`).join(', ');
+      await db.runAsync(`update notes set ${assignments} where id = ?`, [...values, id]);
+    },
+
+    async setBody(id, body) {
+      const existing = await this.get(id);
+      if (existing === null) return null;
+
+      const next = editBody(existing, body, new Date());
+      await this.update(id, { body: next.body, title: next.title, updatedAt: next.updatedAt });
+      return next;
+    },
+
+    async softDelete(id) {
+      await this.update(id, { deleted: true });
+    },
+
+    async restore(id) {
+      await this.update(id, { deleted: false });
+    },
+  };
+}

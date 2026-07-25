@@ -1,0 +1,40 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+build/
+*.tsbuildinfo
+
+# expo
+.expo/
+.expo-shared/
+apps/mobile/android/
+apps/mobile/ios/
+*.orig.*
+web-build/
+
+# native
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# supabase local
+supabase/.branches/
+supabase/.temp/
+
+# testing
+coverage/
+
+# editors / os
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*

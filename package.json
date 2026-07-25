@@ -1,0 +1,25 @@
+{
+  "name": "dailynote-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "start": "npm run start --workspace @dailynote/mobile",
+    "android": "npm run android --workspace @dailynote/mobile",
+    "ios": "npm run ios --workspace @dailynote/mobile",
+    "db:generate": "npm run generate --workspace @dailynote/db"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  }
+}
