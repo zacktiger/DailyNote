@@ -1,18 +1,29 @@
 # Implementation Plan — Rollout 1
 
 **Goal:** a shippable, open-source, private notes app with fast capture and a follow-through loop.
-**Explicitly out of scope:** the social layer. That is Rollout 2.
+**Explicitly out of scope:** the social layer. That is [Rollout 2](plan-rollout-2.md).
+**What the product is, whole:** [product.md](product.md). If this plan contradicts it, that doc wins.
 
 ---
 
-## 0. Three corrections to the stack doc
+## 0. Three corrections to the stack doc — all now decided
 
-These change the plan, so they go first.
+These changed the plan, so they went first. Each has since been settled in an ADR; the sections
+below are kept for the reasoning, but **the ADR is the current answer.**
+
+| | Question | Settled by |
+|---|---|---|
+| 0.1 | Can we read Apple Notes / Google Keep? | [ADR 0003](adr/0003-no-notes-app-integrations.md) — no API, integration dropped |
+| 0.2 | Legend-State persistence vs. relational SQLite | [ADR 0001](adr/0001-local-storage-shape.md) — real tables behind a repository interface |
+| 0.3 | E2EE or server-readable | [ADR 0002](adr/0002-no-end-to-end-encryption.md) — server-readable, `local_only` is the valve |
 
 ### 0.1 You cannot read Apple Notes or Google Keep. There is no API.
 
-The pitch says "connect it to your local notes app and they get regularly uploaded." On both
-platforms this is not buildable as described:
+> **Decided: dropped entirely.** See [ADR 0003](adr/0003-no-notes-app-integrations.md), which
+> supersedes the recommendation in this section — including the Shortcuts recipe.
+
+The original pitch said "connect it to your local notes app and they get regularly uploaded." On
+both platforms this is not buildable as described:
 
 | Source | Programmatic read? | Reality |
 |---|---|---|
@@ -22,23 +33,27 @@ platforms this is not buildable as described:
 | Obsidian / Markdown vault | **Yes** | Plain files in a folder. |
 | Any app | **Yes, user-initiated** | Share sheet. |
 
-So "connect your notes app" has to be reframed, and this is the honest version:
+So there is no integration to build. Capture is user-initiated, everywhere:
 
-1. **Share sheet** (`expo-share-intent`) — works everywhere, one tap, both platforms. This is the
-   real primary ingestion path.
-2. **URL scheme + iOS Shortcuts** — ship `yourapp://new?text=...&source=shortcuts`. Then publish a
-   Shortcut recipe users install once: *"When I leave a note in Apple Notes tagged #share, send it
-   to the app."* Shortcuts can read Notes even though you cannot. **You get Apple Notes ingestion
-   by proxy, for roughly 20 lines of deep-link code.** Highest leverage item in the whole plan.
-3. **Markdown folder sync** — Android via `expo-file-system` StorageAccessFramework (persistable
-   URI permission, survives reboot). iOS folder access is materially harder and is a Phase 5 item,
-   not a Phase 1 one.
-4. **Clipboard / quick capture widget** — Phase 5.
+1. **Composer** — the launch screen. The primary path by a wide margin.
+2. **Share sheet** (`expo-share-intent`) — works everywhere, one tap, both platforms. Phase 2.
+3. **URL scheme** — `dailynote://new?text=...`. ~20 lines, Phase 2. ADR 0003 keeps the deep link
+   and drops the *published Shortcut recipe* that was going to sit on top of it: shipping a recipe
+   means owning it every time Apple changes Shortcuts. Revisit as documentation after Phase 2.
+4. **Markdown folder sync** — Android via `expo-file-system` StorageAccessFramework (persistable
+   URI permission, survives reboot). A folder of files is not an API, and Obsidian users are a real
+   target. iOS folder access is materially harder. Both Phase 5.
+5. **Clipboard / quick capture widget** — Phase 5.
 
-Do not promise "auto-sync with your notes app" in store copy. Promise "one tap from anywhere,
-and an automation recipe for Apple Notes." That is deliverable and honest.
+Do not promise "auto-sync with your notes app" in store copy. Promise "one tap from anywhere."
+That is deliverable and honest.
 
 ### 0.2 "expo-sqlite as source of truth" and "Legend-State persistence" are probably in conflict
+
+> **Decided for now:** [ADR 0001](adr/0001-local-storage-shape.md) takes neither A nor B yet. Phase
+> 1–3 uses real relational SQLite tables behind a repository interface, which keeps both doors
+> open; the A-vs-B choice moves to Phase 4, when sync makes it actually load-bearing. The spike
+> below still needs running before then.
 
 Legend-State's persistence plugins are **key-value**: they serialize an observable under a name.
 The expo-sqlite plugin, as far as I know, stores blobs, not relational rows. If that holds, then:
@@ -68,6 +83,9 @@ week 1** — it is the only decision in the stack that is expensive to reverse.
 
 ### 0.3 Encryption vs. AI: you can only pick one, and you should pick now
 
+> **Decided: no E2EE**, per [ADR 0002](adr/0002-no-end-to-end-encryption.md) — the recommended
+> option below. It is stated plainly in the README and belongs in onboarding.
+
 The doc banks on pgvector + FTS in Postgres for cheap AI later. That requires plaintext on the
 server. So end-to-end encryption is off the table permanently, not "later."
 
@@ -87,7 +105,8 @@ Do not defer. Retrofitting E2EE onto a synced note store is a rewrite.
 
 ## 1. What the product actually is
 
-Reduced to one sentence so scope creep has something to bounce off:
+The full statement is [product.md](product.md). Reduced to one sentence so scope creep has
+something to bounce off:
 
 > A place where a note you wrote once comes back to you at the right time and asks whether
 > anything came of it.
@@ -251,8 +270,8 @@ That last exit criterion is the real gate. If it fails, no amount of Phase 3 fix
 
 ### Phase 2 — Capture surfaces · ~1 week
 - `expo-share-intent` → share sheet, text + URL, both platforms
-- URL scheme + `+native-intent.ts`, and **ship the iOS Shortcut recipe** (§0.1). Write it, test
-  it, put the install link in onboarding
+- `dailynote://new?text=...` URL scheme + `+native-intent.ts`. **No Shortcut recipe** — ADR 0003
+  drops it as a shipped promise. The deep link is what makes one writable later, by anyone
 - Android: persistent low-priority notification with a "New note" action. Far cheaper than a
   widget and covers most of the value
 - Captured items land private, tagged with `source`
@@ -316,16 +335,18 @@ Cheap now, expensive to retrofit:
 
 ## 6. Open decisions
 
-Ordered by how expensive they are to defer.
+Ordered by how expensive they are to defer. See [the ADR index](adr/README.md) for the current
+state of all of these.
 
-| # | Decision | Recommendation | Deadline |
+| # | Decision | Outcome | |
 |---|---|---|---|
-| 1 | Legend-State persistence shape (§0.2) | Spike it, then A | Week 1 |
-| 2 | E2EE or server-readable (§0.3) | Server-readable + `local_only` flag | Week 1 |
-| 3 | License | **AGPL-3.0** for the server, **MIT** for the app. AGPL is what stops a Rollout-2 feed from being lifted as a closed SaaS while keeping the client trivially forkable | Phase 0 |
+| 1 | Legend-State persistence shape (§0.2) | Relational SQLite behind a repository interface; A-vs-B deferred to Phase 4 — [ADR 0001](adr/0001-local-storage-shape.md) | ✅ |
+| 2 | E2EE or server-readable (§0.3) | Server-readable + `local_only` flag — [ADR 0002](adr/0002-no-end-to-end-encryption.md) | ✅ |
+| 3 | License | MIT app + core, AGPL-3.0 DB + server — [ADR 0004](adr/0004-licensing.md) | ✅ |
+| 5 | Name + bundle ID | **DailyNote**, `com.zacktiger.dailynote`, scheme `dailynote://` | ✅ |
+| — | Notes-app integration | Dropped, no API exists — [ADR 0003](adr/0003-no-notes-app-integrations.md) | ✅ |
 | 4 | Sign in with Apple | **Not required** if magic-link is the only auth. Apple mandates it only when you offer third-party social login. Skipping it is correct for Rollout 1 | Phase 4 |
-| 5 | Name + bundle ID | Whatever — but register it before Phase 2, deep links depend on it | Phase 2 |
-| 6 | Web | Marketing page only. Do not ship Expo Web in Rollout 1 | Phase 6 |
+| 6 | Web | Marketing page only in Rollout 1 — no Expo Web. Rollout 2 adds a separate server-rendered read surface, which is not this | Phase 6 |
 
 ---
 
@@ -333,7 +354,7 @@ Ordered by how expensive they are to defer.
 
 | Risk | Mitigation |
 |---|---|
-| "Connect your notes app" is undeliverable as pitched | Reframe to share sheet + Shortcuts recipe + markdown folder (§0.1). Fix the messaging before writing store copy |
+| "Connect your notes app" is undeliverable as pitched | Dropped, not reframed — ADR 0003. Capture is composer + share sheet + URL scheme, with markdown folders in Phase 5. Store copy says "one tap from anywhere" and never "auto-sync" |
 | Follow-through becomes a to-do list | The review card has **four** answers including "let go". No due dates, no overdue red badges, no streaks. Guilt is the failure mode |
 | Sync eats the project | It is Phase 4, behind a working app. If it slips, you still have something shippable |
 | SDK 57 / library versions in the stack doc are stale by ship time | Pin versions in Phase 0, upgrade deliberately once, mid-Phase-4 |
@@ -341,12 +362,16 @@ Ordered by how expensive they are to defer.
 
 ---
 
-## 8. First week, concretely
+## 8. First week, concretely — done
 
-1. Spike Legend-State persistence, inspect the SQLite file, decide §0.2 — **1 hour, do it first**
-2. Decide §0.3 and write it into the README
-3. `create-expo-app`, monorepo, NativeWind, expo-router, CI
-4. Drizzle schema from §2, Supabase project, migration applied
-5. Composer screen that saves to local storage and survives an app restart
+Phase 0 is complete. All of the below shipped in `689c373`:
 
-Item 5 is the whole thing in miniature. If it feels good to type into, you have a product.
+1. ~~Spike Legend-State persistence, decide §0.2~~ → deferred deliberately, ADR 0001
+2. ~~Decide §0.3 and write it into the README~~ → ADR 0002, in the README
+3. ~~`create-expo-app`, monorepo, NativeWind, expo-router, CI~~
+4. ~~Drizzle schema from §2, migration applied~~ → `supabase/migrations/20260726000000_init.sql`
+5. ~~Composer screen that saves to local storage and survives an app restart~~
+
+Item 5 was the whole thing in miniature. **Next up is Phase 1**, and its exit criterion is the
+real gate on the entire plan: *use it as your own daily notes app for a week without reaching for
+another app.* Nothing after it is worth building if that fails.

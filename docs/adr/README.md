@@ -3,6 +3,9 @@
 One file per decision that was expensive to make or would be expensive to reverse. If you find
 yourself re-arguing something, it belongs here.
 
+Product-level decisions — what is in and what is out — live in [product.md](../product.md), not
+here. These are the technical ones.
+
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-local-storage-shape.md) | Local storage shape — relational SQLite behind a repository interface | Accepted for Phase 1–3; §0.2 deferred to Phase 4 |
