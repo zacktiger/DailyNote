@@ -13,6 +13,10 @@ import Animated, {
 // because every screen that animates imports this module.
 cssInterop(Animated.View, { className: 'style' });
 cssInterop(Animated.Text, { className: 'style' });
+cssInterop(Animated.FlatList, {
+  className: 'style',
+  contentContainerClassName: 'contentContainerStyle',
+});
 
 /** Pressable that accepts both an animated style and Tailwind classes. */
 export const AnimatedPressable = Animated.createAnimatedComponent(Pressable);

@@ -1,9 +1,16 @@
 import { searchNotes, type Note } from '@dailynote/core';
 import { Link, Stack } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 
 import { relativeDay } from '@/lib/format';
+import * as motion from '@/lib/motion';
+import { AnimatedPressable } from '@/lib/motion';
 import { useNotes } from '@/store/notes-store';
 import { useTheme } from '@/theme';
 
@@ -37,21 +44,22 @@ export default function NotesList() {
           autoCorrect={false}
           returnKeyType="search"
           selectionColor={theme.accent}
-          className="rounded-xl bg-line/40 px-4 py-2.5 text-base text-ink web:outline-none dark:bg-line-dark/50 dark:text-ink-dark"
+          className="rounded-xl bg-line/40 px-4 py-2.5 text-base text-ink web:outline-none focus:bg-line/60 dark:bg-line-dark/50 dark:text-ink-dark dark:focus:bg-line-dark/70"
         />
       </View>
 
-      <FlatList
+      <Animated.FlatList
         data={results}
         keyExtractor={(result) => result.note.id}
         keyboardDismissMode="on-drag"
         contentContainerClassName="pb-16"
+        itemLayoutAnimation={motion.layout}
         ItemSeparatorComponent={() => (
           <View className="ml-5 h-px bg-line dark:bg-line-dark" />
         )}
         ListEmptyComponent={
           loading ? null : (
-            <View className="items-center px-10 pt-24">
+            <Animated.View entering={motion.enterFade} className="items-center px-10 pt-24">
               <Text className="font-serif-italic text-lg text-muted dark:text-muted-dark">
                 {query.length > 0 ? 'Nothing matches.' : 'No notes yet.'}
               </Text>
@@ -60,7 +68,7 @@ export default function NotesList() {
                   What you write stays on this device.
                 </Text>
               ) : null}
-            </View>
+            </Animated.View>
           )
         }
         renderItem={({ item }) => <NoteRow note={item.note} />}
@@ -72,9 +80,27 @@ export default function NotesList() {
 function NoteRow({ note }: { note: Note }) {
   const preview = note.body.split('\n').slice(1).join(' ').trim();
 
+  // Rows dip very slightly under the finger; the spring makes it feel like
+  // paper giving, not a button.
+  const pressed = useSharedValue(0);
+  const pressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 - 0.02 * pressed.value }],
+  }));
+
   return (
     <Link href={{ pathname: '/note/[id]', params: { id: note.id } }} asChild>
-      <Pressable className="px-5 py-3.5 active:bg-line/30 dark:active:bg-line-dark/30">
+      <AnimatedPressable
+        entering={motion.enterFade}
+        exiting={motion.exit}
+        onPressIn={() => {
+          pressed.value = withSpring(1, motion.SPRING);
+        }}
+        onPressOut={() => {
+          pressed.value = withSpring(0, motion.SPRING);
+        }}
+        style={pressStyle}
+        className="px-5 py-3.5 active:bg-line/30 dark:active:bg-line-dark/30"
+      >
         <View className="flex-row items-center gap-2">
           {note.nextReviewAt !== null ? (
             <View className="h-1.5 w-1.5 rounded-full bg-accent dark:bg-accent-dark" />
@@ -95,7 +121,7 @@ function NoteRow({ note }: { note: Note }) {
             {preview}
           </Text>
         ) : null}
-      </Pressable>
+      </AnimatedPressable>
     </Link>
   );
 }
