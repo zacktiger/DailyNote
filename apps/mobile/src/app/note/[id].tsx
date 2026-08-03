@@ -10,8 +10,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { comesBack, formatDay } from '@/lib/format';
+import { haptics } from '@/lib/haptics';
+import * as motion from '@/lib/motion';
+import { AnimatedPressable } from '@/lib/motion';
 import { useNotes } from '@/store/notes-store';
 import { useTheme } from '@/theme';
 
@@ -63,6 +67,7 @@ function NoteEditor({ note }: { note: Note }) {
             <Pressable
               hitSlop={12}
               onPress={async () => {
+                haptics.tap();
                 await softDelete(note.id);
                 router.back();
               }}
@@ -90,37 +95,50 @@ function NoteEditor({ note }: { note: Note }) {
           selectionColor={theme.accent}
         />
 
-        <View className="px-5 pt-2">
+        {/* The follow-through loop's entry point. Promoting crossfades the
+            pill into the status with a spring reflow and the app's single
+            success haptic -- it should feel like something latched, quietly. */}
+        <Animated.View layout={motion.layout} className="px-5 pt-2">
           {isCommitment ? (
             // Forward-looking only. `reviewCount` drives the ladder but is
             // never shown: a tally of how many times you deferred something is
             // a guilt counter, and guilt is the failure mode for this app.
-            <View className="flex-row items-center gap-2">
+            <Animated.View
+              entering={motion.enter}
+              exiting={motion.exit}
+              className="flex-row items-center gap-2"
+            >
               <View className="h-1.5 w-1.5 rounded-full bg-accent dark:bg-accent-dark" />
               <Text className="text-sm font-medium text-accent dark:text-accent-dark">
                 Comes back {comesBack(note.nextReviewAt!)}
               </Text>
-            </View>
+            </Animated.View>
           ) : (
-            <Pressable
+            <AnimatedPressable
+              entering={motion.enterFade}
+              exiting={motion.exit}
               className="self-start rounded-full bg-accent/10 px-4 py-2 active:opacity-60 dark:bg-accent-dark/15"
-              onPress={() => void promote(note.id)}
+              onPress={() => {
+                haptics.success();
+                void promote(note.id);
+              }}
             >
               <Text className="text-sm font-medium text-accent dark:text-accent-dark">
                 Follow up
               </Text>
-            </Pressable>
+            </AnimatedPressable>
           )}
-        </View>
+        </Animated.View>
 
         {updates.length > 0 ? (
           <View className="px-5 pt-10">
             <Text className="pb-3 text-[11px] uppercase tracking-[2px] text-muted dark:text-muted-dark">
               Updates
             </Text>
-            {updates.map((update) => (
-              <View
+            {updates.map((update, index) => (
+              <Animated.View
                 key={update.id}
+                entering={motion.stagger(index)}
                 className="mb-4 border-l-2 border-line pl-4 dark:border-line-dark"
               >
                 <Text className="text-xs text-muted dark:text-muted-dark">
@@ -129,7 +147,7 @@ function NoteEditor({ note }: { note: Note }) {
                 <Text className="pt-1 font-serif text-[17px] leading-7 text-ink dark:text-ink-dark">
                   {update.body}
                 </Text>
-              </View>
+              </Animated.View>
             ))}
           </View>
         ) : null}
