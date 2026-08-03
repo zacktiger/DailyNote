@@ -1,0 +1,8 @@
+{
+  "paper": { "light": "#faf9f5", "dark": "#121110" },
+  "ink": { "light": "#211f1c", "dark": "#ece9e2" },
+  "muted": { "light": "#6f6a60", "dark": "#98928a" },
+  "faint": { "light": "#aaa49a", "dark": "#5c574f" },
+  "line": { "light": "#e8e5dc", "dark": "#2a2723" },
+  "accent": { "light": "#31684d", "dark": "#a4c8b2" }
+}

@@ -14,8 +14,9 @@
     "doctor": "npx expo-doctor"
   },
   "dependencies": {
-    "@expo/ui": "~57.0.7",
     "@dailynote/core": "*",
+    "@expo-google-fonts/newsreader": "^0.4.1",
+    "@expo/ui": "~57.0.7",
     "expo": "~57.0.8",
     "expo-constants": "~57.0.7",
     "expo-crypto": "~57.0.1",

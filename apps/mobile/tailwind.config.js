@@ -1,3 +1,5 @@
+const palette = require('./src/theme/colors.json');
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
@@ -6,12 +8,23 @@ module.exports = {
     extend: {
       colors: {
         // Paper, not chrome. A notes app should feel like a surface you write
-        // on, so the palette is deliberately near-monochrome.
-        paper: { DEFAULT: '#ffffff', dark: '#0b0b0f' },
-        ink: { DEFAULT: '#16161a', dark: '#f4f4f5' },
-        muted: { DEFAULT: '#71717a', dark: '#8b8b93' },
-        line: { DEFAULT: '#e4e4e7', dark: '#26262c' },
-        accent: { DEFAULT: '#2563eb', dark: '#60a5fa' },
+        // on, so the palette is warm near-monochrome with one quiet accent
+        // reserved for commitments. Hex values live in src/theme/colors.json,
+        // shared with runtime code via src/theme.
+        paper: { DEFAULT: palette.paper.light, dark: palette.paper.dark },
+        ink: { DEFAULT: palette.ink.light, dark: palette.ink.dark },
+        muted: { DEFAULT: palette.muted.light, dark: palette.muted.dark },
+        faint: { DEFAULT: palette.faint.light, dark: palette.faint.dark },
+        line: { DEFAULT: palette.line.light, dark: palette.line.dark },
+        accent: { DEFAULT: palette.accent.light, dark: palette.accent.dark },
+      },
+      fontFamily: {
+        // Newsreader carries the writing surface; UI chrome stays on the
+        // system sans. React Native needs one exact family name per weight,
+        // so these must not be combined with font-weight utilities.
+        serif: ['Newsreader_400Regular'],
+        'serif-medium': ['Newsreader_500Medium'],
+        'serif-italic': ['Newsreader_400Regular_Italic'],
       },
     },
   },

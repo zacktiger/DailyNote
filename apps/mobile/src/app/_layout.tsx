@@ -1,32 +1,59 @@
+import {
+  Newsreader_400Regular,
+  Newsreader_400Regular_Italic,
+  Newsreader_500Medium,
+  useFonts,
+} from '@expo-google-fonts/newsreader';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
-import { Suspense } from 'react';
-import { ActivityIndicator, useColorScheme, View } from 'react-native';
+import { Suspense, useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { migrate } from '@/db/migrations';
 import { NotesProvider } from '@/store/notes-store';
+import { useTheme } from '@/theme';
 
 import '../global.css';
 
 export const DATABASE_NAME = 'dailynote.db';
 
+// Hold the splash until the serif is ready: the composer is the launch screen,
+// and it must not flash from system font to Newsreader mid-boot.
+void SplashScreen.preventAutoHideAsync();
+
 export default function RootLayout() {
-  const dark = useColorScheme() === 'dark';
+  const theme = useTheme();
+  const [fontsReady, fontError] = useFonts({
+    Newsreader_400Regular,
+    Newsreader_400Regular_Italic,
+    Newsreader_500Medium,
+  });
+  // A font failure falls back to system fonts rather than blocking launch.
+  const ready = fontsReady || fontError !== null;
+
+  useEffect(() => {
+    if (ready) void SplashScreen.hideAsync();
+  }, [ready]);
+
+  if (!ready) return null;
 
   return (
     <SafeAreaProvider>
-      <Suspense fallback={<Booting dark={dark} />}>
+      <Suspense fallback={<Booting />}>
         <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrate} useSuspense>
           <NotesProvider>
-            <StatusBar style={dark ? 'light' : 'dark'} />
+            <StatusBar style={theme.dark ? 'light' : 'dark'} />
             <Stack
               screenOptions={{
                 headerShadowVisible: false,
-                headerStyle: { backgroundColor: dark ? '#0b0b0f' : '#ffffff' },
-                headerTintColor: dark ? '#f4f4f5' : '#16161a',
-                contentStyle: { backgroundColor: dark ? '#0b0b0f' : '#ffffff' },
+                headerStyle: { backgroundColor: theme.paper },
+                headerTintColor: theme.ink,
+                headerTitleStyle: { fontFamily: 'Newsreader_500Medium', fontSize: 19 },
+                headerBackButtonDisplayMode: 'minimal',
+                contentStyle: { backgroundColor: theme.paper },
               }}
             >
               {/* The composer is the launch screen: the app opens with the
@@ -42,10 +69,11 @@ export default function RootLayout() {
   );
 }
 
-function Booting({ dark }: { dark: boolean }) {
+function Booting() {
+  const theme = useTheme();
   return (
     <View className="flex-1 items-center justify-center bg-paper dark:bg-paper-dark">
-      <ActivityIndicator color={dark ? '#f4f4f5' : '#16161a'} />
+      <ActivityIndicator color={theme.muted} />
     </View>
   );
 }
