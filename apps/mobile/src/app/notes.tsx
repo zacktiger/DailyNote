@@ -1,7 +1,10 @@
 import { searchNotes, type Note } from '@dailynote/core';
 import { Link, Stack } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Pressable, Text, TextInput, View } from 'react-native';
+import ReanimatedSwipeable, {
+  type SwipeableMethods,
+} from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -9,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { relativeDay } from '@/lib/format';
+import { haptics } from '@/lib/haptics';
 import * as motion from '@/lib/motion';
 import { AnimatedPressable } from '@/lib/motion';
 import { useNotes } from '@/store/notes-store';
@@ -78,6 +82,8 @@ export default function NotesList() {
 }
 
 function NoteRow({ note }: { note: Note }) {
+  const { softDelete } = useNotes();
+  const swipeable = useRef<SwipeableMethods>(null);
   const preview = note.body.split('\n').slice(1).join(' ').trim();
 
   // Rows dip very slightly under the finger; the spring makes it feel like
@@ -88,7 +94,27 @@ function NoteRow({ note }: { note: Note }) {
   }));
 
   return (
-    <Link href={{ pathname: '/note/[id]', params: { id: note.id } }} asChild>
+    <ReanimatedSwipeable
+      ref={swipeable}
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+      renderRightActions={() => (
+        // Muted, not red: deletion here is a soft delete, and alarm colours
+        // would make tidying feel like danger.
+        <Pressable
+          onPress={() => {
+            haptics.tap();
+            swipeable.current?.close();
+            void softDelete(note.id);
+          }}
+          className="w-24 items-center justify-center bg-line/60 active:opacity-60 dark:bg-line-dark/60"
+        >
+          <Text className="text-sm font-medium text-muted dark:text-muted-dark">Delete</Text>
+        </Pressable>
+      )}
+    >
+      <Link href={{ pathname: '/note/[id]', params: { id: note.id } }} asChild>
       <AnimatedPressable
         entering={motion.enterFade}
         exiting={motion.exit}
@@ -122,6 +148,7 @@ function NoteRow({ note }: { note: Note }) {
           </Text>
         ) : null}
       </AnimatedPressable>
-    </Link>
+      </Link>
+    </ReanimatedSwipeable>
   );
 }

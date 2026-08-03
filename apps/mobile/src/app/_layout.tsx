@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { colorScheme as nativewindColorScheme } from 'nativewind';
 import { Suspense, useEffect } from 'react';
 import { ActivityIndicator, Platform, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { migrate } from '@/db/migrations';
@@ -52,31 +53,33 @@ export default function RootLayout() {
   if (!ready) return null;
 
   return (
-    <SafeAreaProvider>
-      <Suspense fallback={<Booting />}>
-        <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrate} useSuspense>
-          <NotesProvider>
-            <StatusBar style={theme.dark ? 'light' : 'dark'} />
-            <Stack
-              screenOptions={{
-                headerShadowVisible: false,
-                headerStyle: { backgroundColor: theme.paper },
-                headerTintColor: theme.ink,
-                headerTitleStyle: { fontFamily: 'Newsreader_500Medium', fontSize: 19 },
-                headerBackButtonDisplayMode: 'minimal',
-                contentStyle: { backgroundColor: theme.paper },
-              }}
-            >
-              {/* The composer is the launch screen: the app opens with the
-                  cursor already in an empty note. */}
-              <Stack.Screen name="index" options={{ headerShown: false }} />
-              <Stack.Screen name="notes" options={{ title: 'Notes' }} />
-              <Stack.Screen name="note/[id]" options={{ title: '' }} />
-            </Stack>
-          </NotesProvider>
-        </SQLiteProvider>
-      </Suspense>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <Suspense fallback={<Booting />}>
+          <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrate} useSuspense>
+            <NotesProvider>
+              <StatusBar style={theme.dark ? 'light' : 'dark'} />
+              <Stack
+                screenOptions={{
+                  headerShadowVisible: false,
+                  headerStyle: { backgroundColor: theme.paper },
+                  headerTintColor: theme.ink,
+                  headerTitleStyle: { fontFamily: 'Newsreader_500Medium', fontSize: 19 },
+                  headerBackButtonDisplayMode: 'minimal',
+                  contentStyle: { backgroundColor: theme.paper },
+                }}
+              >
+                {/* The composer is the launch screen: the app opens with the
+                    cursor already in an empty note. */}
+                <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen name="notes" options={{ title: 'Notes' }} />
+                <Stack.Screen name="note/[id]" options={{ title: '' }} />
+              </Stack>
+            </NotesProvider>
+          </SQLiteProvider>
+        </Suspense>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
