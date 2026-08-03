@@ -8,8 +8,9 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
+import { colorScheme as nativewindColorScheme } from 'nativewind';
 import { Suspense, useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { migrate } from '@/db/migrations';
@@ -37,6 +38,16 @@ export default function RootLayout() {
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync();
   }, [ready]);
+
+  useEffect(() => {
+    // Web only: with darkMode 'class' (see tailwind.config.js), dark: styles
+    // activate via a class on <html>; keep it mirroring the OS setting.
+    // Native must not take this path -- set() there overrides the app-level
+    // appearance instead of following the system.
+    if (Platform.OS === 'web') {
+      nativewindColorScheme.set(theme.dark ? 'dark' : 'light');
+    }
+  }, [theme.dark]);
 
   if (!ready) return null;
 

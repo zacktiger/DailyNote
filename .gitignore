@@ -38,3 +38,6 @@ coverage/
 Thumbs.db
 *.log
 npm-debug.log*
+
+# playwright mcp artifacts
+.playwright-mcp/

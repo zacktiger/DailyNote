@@ -23,4 +23,14 @@ config.resolver.nodeModulesPaths = [
 // 3. Do not walk up past the workspace root looking for modules.
 config.resolver.disableHierarchicalLookup = true;
 
+// 4. expo-sqlite on web: its worker imports a .wasm binary, and the wasm
+// build needs SharedArrayBuffer, which browsers only enable behind
+// cross-origin isolation headers.
+config.resolver.assetExts.push('wasm');
+config.server.enhanceMiddleware = (middleware) => (req, res, next) => {
+  res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  middleware(req, res, next);
+};
+
 module.exports = withNativeWind(config, { input: './src/global.css' });

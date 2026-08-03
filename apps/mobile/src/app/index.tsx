@@ -98,7 +98,7 @@ export default function Composer() {
           textAlignVertical="top"
           placeholder="What's on your mind?"
           placeholderTextColor={theme.faint}
-          className="flex-1 px-5 pt-2 font-serif text-[21px] leading-8 text-ink dark:text-ink-dark"
+          className="flex-1 px-5 pt-2 font-serif text-[21px] leading-8 text-ink web:outline-none dark:text-ink-dark"
           selectionColor={theme.accent}
         />
 

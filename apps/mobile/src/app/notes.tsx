@@ -37,7 +37,7 @@ export default function NotesList() {
           autoCorrect={false}
           returnKeyType="search"
           selectionColor={theme.accent}
-          className="rounded-xl bg-line/40 px-4 py-2.5 text-base text-ink dark:bg-line-dark/50 dark:text-ink-dark"
+          className="rounded-xl bg-line/40 px-4 py-2.5 text-base text-ink web:outline-none dark:bg-line-dark/50 dark:text-ink-dark"
         />
       </View>
 

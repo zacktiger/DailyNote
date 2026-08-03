@@ -4,6 +4,11 @@ const palette = require('./src/theme/colors.json');
 module.exports = {
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
   presets: [require('nativewind/preset')],
+  // 'class' instead of the default 'media' because NativeWind's web runtime
+  // crashes in dev under 'media' ("Cannot manually set color scheme").
+  // Native is unaffected -- it follows the system scheme either way -- and
+  // the web <html> class is synced to the OS setting in app/_layout.tsx.
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {

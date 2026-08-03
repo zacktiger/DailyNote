@@ -86,7 +86,7 @@ function NoteEditor({ note }: { note: Note }) {
           }}
           multiline
           textAlignVertical="top"
-          className="min-h-[220px] px-5 pt-3 font-serif text-[21px] leading-8 text-ink dark:text-ink-dark"
+          className="min-h-[220px] px-5 pt-3 font-serif text-[21px] leading-8 text-ink web:outline-none dark:text-ink-dark"
           selectionColor={theme.accent}
         />
 
