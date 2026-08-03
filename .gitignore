@@ -41,3 +41,6 @@ npm-debug.log*
 
 # playwright mcp artifacts
 .playwright-mcp/
+
+# stray desktop screenshots (repo lives on the Desktop)
+Screenshot*.png
