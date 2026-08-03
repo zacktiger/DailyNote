@@ -1,10 +1,22 @@
-import {
+import { cssInterop } from 'nativewind';
+import { Pressable } from 'react-native';
+import Animated, {
   FadeIn,
   FadeInDown,
   FadeOut,
   LinearTransition,
   ReduceMotion,
 } from 'react-native-reanimated';
+
+// NativeWind only styles components registered with it; Animated.* are not,
+// so className on them silently does nothing until this runs. Registered here
+// because every screen that animates imports this module.
+cssInterop(Animated.View, { className: 'style' });
+cssInterop(Animated.Text, { className: 'style' });
+
+/** Pressable that accepts both an animated style and Tailwind classes. */
+export const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+cssInterop(AnimatedPressable, { className: 'style' });
 
 /**
  * The motion system: one spring, one duration, used everywhere.

@@ -1,6 +1,6 @@
 import { hasCommitmentTag, parseHashtags } from '@dailynote/core';
 import { Link } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,9 +9,19 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Animated, {
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { todayHeading } from '@/lib/format';
+import { haptics } from '@/lib/haptics';
+import * as motion from '@/lib/motion';
+import { AnimatedPressable } from '@/lib/motion';
 import { useNotes } from '@/store/notes-store';
 import { useTheme } from '@/theme';
 
@@ -33,6 +43,43 @@ export default function Composer() {
   const willCommit = hasCommitmentTag(body);
   const canSave = body.trim().length > 0 && !saving;
 
+  // Save pill: springs between its disabled and enabled state instead of
+  // snapping, and dips under the finger while pressed.
+  const enabled = useSharedValue(0);
+  const pressed = useSharedValue(0);
+  useEffect(() => {
+    enabled.value = withSpring(canSave ? 1 : 0, motion.SPRING);
+  }, [canSave, enabled]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      enabled.value,
+      [0, 1],
+      [`${theme.line}99`, theme.ink],
+    ),
+    transform: [{ scale: (0.96 + 0.04 * enabled.value) * (1 - 0.03 * pressed.value) }],
+  }));
+  const pillLabelStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(enabled.value, [0, 1], [theme.faint, theme.paper]),
+  }));
+
+  // The quiet acknowledgment that capture happened: the note count ticks up
+  // with a small pulse. No toast, no checkmark.
+  const countPulse = useSharedValue(1);
+  const prevCount = useRef(notes.length);
+  useEffect(() => {
+    if (notes.length > prevCount.current) {
+      countPulse.value = withSequence(
+        withSpring(1.15, { ...motion.SPRING, stiffness: 500 }),
+        withSpring(1, motion.SPRING),
+      );
+    }
+    prevCount.current = notes.length;
+  }, [notes.length, countPulse]);
+  const countStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: countPulse.value }],
+  }));
+
   const save = useCallback(async () => {
     if (body.trim().length === 0 || saving) return;
     setSaving(true);
@@ -41,6 +88,7 @@ export default function Composer() {
       // Writing #do promotes the note to a commitment on the spot -- no extra
       // tap, because the tap is what stops people from doing it.
       if (hasCommitmentTag(body)) await promote(note.id);
+      haptics.tap();
       setBody('');
       inputRef.current?.focus();
     } finally {
@@ -54,81 +102,96 @@ export default function Composer() {
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View className="flex-row items-center justify-between px-5 pb-1 pt-2">
-          <Link href="/notes" asChild>
-            <Pressable hitSlop={12} className="active:opacity-60">
-              <Text className="text-[15px] text-muted dark:text-muted-dark">
-                {notes.length > 0 ? `${notes.length} notes` : 'Notes'}
-              </Text>
-            </Pressable>
-          </Link>
+        <Animated.View entering={motion.enterFade} className="flex-1">
+          <View className="flex-row items-center justify-between px-5 pb-1 pt-2">
+            <Link href="/notes" asChild>
+              <Pressable hitSlop={12} className="active:opacity-60">
+                <Animated.Text
+                  style={countStyle}
+                  className="text-[15px] text-muted dark:text-muted-dark"
+                >
+                  {notes.length > 0 ? `${notes.length} notes` : 'Notes'}
+                </Animated.Text>
+              </Pressable>
+            </Link>
 
-          <Pressable
-            hitSlop={8}
-            onPress={save}
-            disabled={!canSave}
-            className={
-              canSave
-                ? 'rounded-full bg-ink px-4 py-1.5 active:opacity-80 dark:bg-ink-dark'
-                : 'rounded-full bg-line/60 px-4 py-1.5 dark:bg-line-dark/60'
-            }
-          >
-            <Text
-              className={
-                canSave
-                  ? 'text-[13px] font-semibold text-paper dark:text-paper-dark'
-                  : 'text-[13px] font-semibold text-faint dark:text-faint-dark'
-              }
+            <AnimatedPressable
+              hitSlop={8}
+              onPress={save}
+              disabled={!canSave}
+              onPressIn={() => {
+                pressed.value = withSpring(1, motion.SPRING);
+              }}
+              onPressOut={() => {
+                pressed.value = withSpring(0, motion.SPRING);
+              }}
+              style={pillStyle}
+              className="rounded-full px-4 py-1.5"
             >
-              Save
-            </Text>
-          </Pressable>
-        </View>
+              <Animated.Text style={pillLabelStyle} className="text-[13px] font-semibold">
+                Save
+              </Animated.Text>
+            </AnimatedPressable>
+          </View>
 
-        <Text className="px-5 pt-3 text-[11px] uppercase tracking-[2px] text-muted dark:text-muted-dark">
-          {todayHeading()}
-        </Text>
+          <Text className="px-5 pt-3 text-[11px] uppercase tracking-[2px] text-muted dark:text-muted-dark">
+            {todayHeading()}
+          </Text>
 
-        <TextInput
-          ref={inputRef}
-          value={body}
-          onChangeText={setBody}
-          autoFocus
-          multiline
-          textAlignVertical="top"
-          placeholder="What's on your mind?"
-          placeholderTextColor={theme.faint}
-          className="flex-1 px-5 pt-2 font-serif text-[21px] leading-8 text-ink web:outline-none dark:text-ink-dark"
-          selectionColor={theme.accent}
-        />
+          <TextInput
+            ref={inputRef}
+            value={body}
+            onChangeText={setBody}
+            autoFocus
+            multiline
+            textAlignVertical="top"
+            placeholder="What's on your mind?"
+            placeholderTextColor={theme.faint}
+            className="flex-1 px-5 pt-2 font-serif text-[21px] leading-8 text-ink web:outline-none dark:text-ink-dark"
+            selectionColor={theme.accent}
+          />
 
-        <View className="flex-row flex-wrap items-center gap-2 px-5 pb-3 pt-2">
-          {willCommit ? (
-            <View className="flex-row items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1.5 dark:bg-accent-dark/15">
-              <View className="h-1.5 w-1.5 rounded-full bg-accent dark:bg-accent-dark" />
-              <Text className="text-xs font-medium text-accent dark:text-accent-dark">
-                comes back in 2 days
-              </Text>
-            </View>
-          ) : null}
-
-          {tags
-            .filter((tag) => tag !== 'do')
-            .map((tag) => (
-              <View
-                key={tag}
-                className="rounded-full bg-line/60 px-3 py-1.5 dark:bg-line-dark/60"
+          <Animated.View
+            layout={motion.layout}
+            className="flex-row flex-wrap items-center gap-2 px-5 pb-3 pt-2"
+          >
+            {willCommit ? (
+              <Animated.View
+                entering={motion.enter}
+                exiting={motion.exit}
+                layout={motion.layout}
+                className="flex-row items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1.5 dark:bg-accent-dark/15"
               >
-                <Text className="text-xs text-muted dark:text-muted-dark">#{tag}</Text>
-              </View>
-            ))}
+                <View className="h-1.5 w-1.5 rounded-full bg-accent dark:bg-accent-dark" />
+                <Text className="text-xs font-medium text-accent dark:text-accent-dark">
+                  comes back in 2 days
+                </Text>
+              </Animated.View>
+            ) : null}
 
-          {tags.length === 0 ? (
-            <Text className="font-serif-italic text-sm text-muted dark:text-muted-dark">
-              #do makes it come back · #tags are just written inline
-            </Text>
-          ) : null}
-        </View>
+            {tags
+              .filter((tag) => tag !== 'do')
+              .map((tag) => (
+                <Animated.View
+                  key={tag}
+                  entering={motion.enter}
+                  exiting={motion.exit}
+                  layout={motion.layout}
+                  className="rounded-full bg-line/60 px-3 py-1.5 dark:bg-line-dark/60"
+                >
+                  <Text className="text-xs text-muted dark:text-muted-dark">#{tag}</Text>
+                </Animated.View>
+              ))}
+
+            {tags.length === 0 ? (
+              <Animated.View entering={motion.enterFade} exiting={motion.exit}>
+                <Text className="font-serif-italic text-sm text-muted dark:text-muted-dark">
+                  #do makes it come back · #tags are just written inline
+                </Text>
+              </Animated.View>
+            ) : null}
+          </Animated.View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
