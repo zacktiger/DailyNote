@@ -1,5 +1,5 @@
-import type { Note } from '@dailynote/core';
-import { createNote, editBody } from '@dailynote/core';
+import type { Block, Note } from '@dailynote/core';
+import { createNote, editBody, editContent } from '@dailynote/core';
 import * as Crypto from 'expo-crypto';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
@@ -17,11 +17,15 @@ export interface NotesRepo {
   create(body: string, options?: CreateOptions): Promise<Note>;
   update(id: string, patch: Partial<Note>): Promise<void>;
   setBody(id: string, body: string): Promise<Note | null>;
+  /** Rich-text edit: writes the document and its plain-text projection together. */
+  setContent(id: string, blocks: readonly Block[]): Promise<Note | null>;
   softDelete(id: string): Promise<void>;
   restore(id: string): Promise<void>;
 }
 
 export interface CreateOptions {
+  /** The block document. Omit for a plain-text note. */
+  doc?: string | null;
   source?: Note['source'];
   sourceRef?: string | null;
   localOnly?: boolean;
@@ -40,6 +44,7 @@ interface NoteRow {
   user_id: string | null;
   body: string;
   title: string | null;
+  doc: string | null;
   root_id: string;
   parent_id: string | null;
   kind: string;
@@ -64,6 +69,7 @@ function toNote(row: NoteRow): Note {
     userId: row.user_id,
     body: row.body,
     title: row.title,
+    doc: row.doc,
     rootId: row.root_id,
     parentId: row.parent_id,
     kind: row.kind as Note['kind'],
@@ -89,6 +95,7 @@ const COLUMNS: Record<keyof Note, string> = {
   userId: 'user_id',
   body: 'body',
   title: 'title',
+  doc: 'doc',
   rootId: 'root_id',
   parentId: 'parent_id',
   kind: 'kind',
@@ -166,7 +173,26 @@ export function createNotesRepo(db: SQLiteDatabase): NotesRepo {
       if (existing === null) return null;
 
       const next = editBody(existing, body, new Date());
-      await this.update(id, { body: next.body, title: next.title, updatedAt: next.updatedAt });
+      await this.update(id, {
+        body: next.body,
+        doc: next.doc,
+        title: next.title,
+        updatedAt: next.updatedAt,
+      });
+      return next;
+    },
+
+    async setContent(id, blocks) {
+      const existing = await this.get(id);
+      if (existing === null) return null;
+
+      const next = editContent(existing, blocks, new Date());
+      await this.update(id, {
+        body: next.body,
+        doc: next.doc,
+        title: next.title,
+        updatedAt: next.updatedAt,
+      });
       return next;
     },
 

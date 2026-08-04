@@ -1,12 +1,23 @@
-import { hasCommitmentTag, parseHashtags } from '@dailynote/core';
+import {
+  documentToText,
+  hasCommitmentTag,
+  insertImage,
+  isEmptyDocument,
+  paragraph,
+  parseHashtags,
+  serializeDocument,
+  setAlign,
+  toggleBullet,
+  type Block,
+} from '@dailynote/core';
 import { Link } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import Animated, {
@@ -18,6 +29,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BlockEditor, type BlockEditorHandle } from '@/components/block-editor';
+import { BlockToolbar } from '@/components/block-toolbar';
+import { pickImage } from '@/lib/attachments';
 import { todayHeading } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import * as motion from '@/lib/motion';
@@ -35,13 +49,18 @@ import { useTheme } from '@/theme';
 export default function Composer() {
   const theme = useTheme();
   const { create, promote, notes } = useNotes();
-  const inputRef = useRef<TextInput>(null);
-  const [body, setBody] = useState('');
+  const [blocks, setBlocks] = useState<Block[]>(() => [paragraph()]);
+  const [focused, setFocused] = useState<number | null>(null);
+  const editor = useRef<BlockEditorHandle>(null);
   const [saving, setSaving] = useState(false);
+  // Bumped after a save: remounting the editor is what clears it and returns
+  // the caret to a fresh title, since autoFocus only fires on mount.
+  const [draft, setDraft] = useState(0);
 
+  const body = documentToText(blocks);
   const tags = parseHashtags(body);
   const willCommit = hasCommitmentTag(body);
-  const canSave = body.trim().length > 0 && !saving;
+  const canSave = !isEmptyDocument(blocks) && !saving;
 
   // Save pill: springs between its disabled and enabled state instead of
   // snapping, and dips under the finger while pressed.
@@ -81,20 +100,22 @@ export default function Composer() {
   }));
 
   const save = useCallback(async () => {
-    if (body.trim().length === 0 || saving) return;
+    if (isEmptyDocument(blocks) || saving) return;
     setSaving(true);
     try {
-      const note = await create(body);
+      // Both representations are written together: the document is the note,
+      // `body` is the plain text everything else reads off it.
+      const note = await create(body, { doc: serializeDocument(blocks) });
       // Writing #do promotes the note to a commitment on the spot -- no extra
       // tap, because the tap is what stops people from doing it.
       if (hasCommitmentTag(body)) await promote(note.id);
       haptics.tap();
-      setBody('');
-      inputRef.current?.focus();
+      setBlocks([paragraph()]);
+      setDraft((count) => count + 1);
     } finally {
       setSaving(false);
     }
-  }, [body, saving, create, promote]);
+  }, [blocks, body, saving, create, promote]);
 
   return (
     <SafeAreaView className="flex-1 bg-paper dark:bg-paper-dark" edges={['top', 'left', 'right']}>
@@ -138,18 +159,24 @@ export default function Composer() {
             {todayHeading()}
           </Text>
 
-          <TextInput
-            ref={inputRef}
-            value={body}
-            onChangeText={setBody}
-            autoFocus
-            multiline
-            textAlignVertical="top"
-            placeholder="What's on your mind?"
-            placeholderTextColor={theme.faint}
-            className="flex-1 px-5 pt-2 font-serif text-[21px] leading-8 text-ink web:outline-none dark:text-ink-dark"
-            selectionColor={theme.accent}
-          />
+          <ScrollView
+            className="flex-1"
+            contentContainerClassName="grow pt-2"
+            keyboardDismissMode="on-drag"
+            // So a tap on the surface below the last line reaches it instead
+            // of only dismissing the keyboard.
+            keyboardShouldPersistTaps="handled"
+          >
+            <BlockEditor
+              key={draft}
+              ref={editor}
+              blocks={blocks}
+              onChange={setBlocks}
+              onFocusChange={setFocused}
+              placeholder="What's on your mind?"
+              autoFocus
+            />
+          </ScrollView>
 
           <Animated.View
             layout={motion.layout}
@@ -191,6 +218,29 @@ export default function Composer() {
               </Animated.View>
             ) : null}
           </Animated.View>
+
+          <BlockToolbar
+            block={focused === null ? undefined : blocks[focused]}
+            onToggleBullet={() => {
+              if (focused === null) return;
+              setBlocks(toggleBullet(blocks, focused));
+              // The toolbar took the tap; give the caret straight back so the
+              // keyboard never drops and the next word goes where it should.
+              editor.current?.restoreFocus();
+            }}
+            onAlign={(align) => {
+              if (focused === null) return;
+              setBlocks(setAlign(blocks, focused, align));
+              editor.current?.restoreFocus();
+            }}
+            onAddImage={async () => {
+              const picked = await pickImage();
+              if (picked === null) return;
+              // Functional update: the picker is a round trip through another
+              // screen, and `blocks` here is from before it opened.
+              setBlocks((current) => insertImage(current, focused, picked));
+            }}
+          />
         </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
