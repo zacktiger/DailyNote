@@ -1,5 +1,7 @@
 {
   "paper": { "light": "#faf9f5", "dark": "#121110" },
+  "canvas": { "light": "#f1efe9", "dark": "#0d0c0b" },
+  "card": { "light": "#fffdf9", "dark": "#1c1a17" },
   "ink": { "light": "#211f1c", "dark": "#ece9e2" },
   "muted": { "light": "#6f6a60", "dark": "#98928a" },
   "faint": { "light": "#aaa49a", "dark": "#5c574f" },

@@ -17,6 +17,8 @@ export function useTheme() {
   return {
     dark,
     paper: dark ? palette.paper.dark : palette.paper.light,
+    canvas: dark ? palette.canvas.dark : palette.canvas.light,
+    card: dark ? palette.card.dark : palette.card.light,
     ink: dark ? palette.ink.dark : palette.ink.light,
     muted: dark ? palette.muted.dark : palette.muted.light,
     faint: dark ? palette.faint.dark : palette.faint.light,
