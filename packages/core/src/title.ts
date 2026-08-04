@@ -1,3 +1,4 @@
+import { stripInlineMarks } from './formatting';
 import { stripHashtags } from './hashtags';
 
 export const DEFAULT_TITLE_LENGTH = 80;
@@ -14,8 +15,8 @@ const LEADING_MARKUP = /^\s*(?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\]\s*)?|>\s+|\d+[.)]\
  */
 export function deriveTitle(body: string, maxLength: number = DEFAULT_TITLE_LENGTH): string | null {
   for (const rawLine of body.split('\n')) {
-    // Strip markup first: a line that is only `## ` is still empty.
-    const line = collapse(stripHashtags(rawLine.replace(LEADING_MARKUP, '')));
+    // Strip markup first: a line that is only `## ` or `**` is still empty.
+    const line = collapse(stripInlineMarks(stripHashtags(rawLine.replace(LEADING_MARKUP, ''))));
     if (line.length === 0) continue;
     return truncate(line, maxLength);
   }

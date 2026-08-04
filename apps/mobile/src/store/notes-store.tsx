@@ -30,6 +30,12 @@ interface NotesContextValue {
   setBody: (id: string, body: string) => Promise<void>;
   softDelete: (id: string) => Promise<void>;
   restore: (id: string) => Promise<void>;
+  purge: (id: string) => Promise<void>;
+  purgeAll: () => Promise<void>;
+  /** Files a note into a notebook; null moves it to the Default notebook. */
+  move: (id: string, notebookId: string | null) => Promise<void>;
+  togglePin: (id: string) => Promise<void>;
+  setLocked: (id: string, locked: boolean) => Promise<void>;
   promote: (id: string) => Promise<void>;
   review: (id: string, answer: ReviewAnswer, updateBody?: string) => Promise<void>;
 }
@@ -87,6 +93,35 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
       async restore(id) {
         await repo.restore(id);
+        await refresh();
+      },
+
+      async purge(id) {
+        await repo.purge(id);
+        await refresh();
+      },
+
+      async purgeAll() {
+        await repo.purgeAll();
+        await refresh();
+      },
+
+      async move(id, notebookId) {
+        await repo.update(id, { notebookId });
+        await refresh();
+      },
+
+      async togglePin(id) {
+        const note = await repo.get(id);
+        if (note === null) return;
+        await repo.update(id, {
+          pinnedAt: note.pinnedAt === null ? new Date().toISOString() : null,
+        });
+        await refresh();
+      },
+
+      async setLocked(id, locked) {
+        await repo.update(id, { locked });
         await refresh();
       },
 

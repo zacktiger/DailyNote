@@ -13,12 +13,17 @@ import type { SQLiteDatabase } from 'expo-sqlite';
  */
 export interface NotesRepo {
   all(): Promise<Note[]>;
+  /** Soft-deleted notes, most recently deleted first. Powers Recently deleted. */
+  deleted(): Promise<Note[]>;
   get(id: string): Promise<Note | null>;
   create(body: string, options?: CreateOptions): Promise<Note>;
   update(id: string, patch: Partial<Note>): Promise<void>;
   setBody(id: string, body: string): Promise<Note | null>;
   softDelete(id: string): Promise<void>;
   restore(id: string): Promise<void>;
+  /** Irreversible. Only reachable from Recently deleted. */
+  purge(id: string): Promise<void>;
+  purgeAll(): Promise<void>;
 }
 
 export interface CreateOptions {
@@ -28,6 +33,7 @@ export interface CreateOptions {
   rootId?: string;
   parentId?: string | null;
   kind?: Note['kind'];
+  notebookId?: string | null;
 }
 
 /** Client-generated UUIDs: offline-safe, and public URLs need no remap later. */
@@ -40,6 +46,9 @@ interface NoteRow {
   user_id: string | null;
   body: string;
   title: string | null;
+  notebook_id: string | null;
+  locked: number;
+  pinned_at: string | null;
   root_id: string;
   parent_id: string | null;
   kind: string;
@@ -64,6 +73,9 @@ function toNote(row: NoteRow): Note {
     userId: row.user_id,
     body: row.body,
     title: row.title,
+    notebookId: row.notebook_id,
+    locked: row.locked === 1,
+    pinnedAt: row.pinned_at,
     rootId: row.root_id,
     parentId: row.parent_id,
     kind: row.kind as Note['kind'],
@@ -89,6 +101,9 @@ const COLUMNS: Record<keyof Note, string> = {
   userId: 'user_id',
   body: 'body',
   title: 'title',
+  notebookId: 'notebook_id',
+  locked: 'locked',
+  pinnedAt: 'pinned_at',
   rootId: 'root_id',
   parentId: 'parent_id',
   kind: 'kind',
@@ -116,8 +131,19 @@ function toColumnValue(value: unknown): string | number | null {
 export function createNotesRepo(db: SQLiteDatabase): NotesRepo {
   return {
     async all() {
+      // Pinned notes float to the top, most recently pinned first; everything
+      // else falls back to recency. `pinned_at is null` sorts 0 before 1, so
+      // ascending on that expression puts pinned rows first.
       const rows = await db.getAllAsync<NoteRow>(
-        'select * from notes where deleted = 0 order by updated_at desc',
+        `select * from notes where deleted = 0
+         order by pinned_at is null, pinned_at desc, updated_at desc`,
+      );
+      return rows.map(toNote);
+    },
+
+    async deleted() {
+      const rows = await db.getAllAsync<NoteRow>(
+        'select * from notes where deleted = 1 order by updated_at desc',
       );
       return rows.map(toNote);
     },
@@ -176,6 +202,14 @@ export function createNotesRepo(db: SQLiteDatabase): NotesRepo {
 
     async restore(id) {
       await this.update(id, { deleted: false });
+    },
+
+    async purge(id) {
+      await db.runAsync('delete from notes where id = ?', id);
+    },
+
+    async purgeAll() {
+      await db.runAsync('delete from notes where deleted = 1');
     },
   };
 }
