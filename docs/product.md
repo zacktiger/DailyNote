@@ -28,13 +28,22 @@ The test is structural, not a matter of emphasis:
 
 Three rules that keep it that way:
 
-1. **The composer never asks who will see this.** No audience selector, no visibility toggle, no
-   "share to feed" checkbox. The moment capture becomes performance it stops being a notes app,
-   and the notes app is what makes the social layer worth anything.
-2. **Private is the default and it is not a setting you can accidentally flip.** Publishing is a
-   deliberate action on an existing note, taken later.
-3. **The published unit is a thread, not a post.** A thread is a commitment plus the record of
-   acting on it. There is no "what's happening?" box, ever.
+1. **The *note* composer never asks who will see this.** No audience selector, no visibility
+   toggle, no "share to feed" checkbox on the writing surface you reach from the Notes tab. The
+   moment capture becomes performance it stops being a notes app, and the notes app is what makes
+   the social layer worth anything.
+2. **Private is the default and it is not a setting you can accidentally flip.** Publishing a note
+   is a deliberate action on an existing note, taken later.
+3. **Posting straight to the feed exists, and it lives behind the Feed tab.** It is a second
+   composer on a separate screen, which states the handle and the word "Public" before a word is
+   typed, and its output never enters the private library.
+
+> **Amended 2026-08-04.** Rule 1 used to cover every composer and rule 3 used to read "there is no
+> 'what's happening?' box, ever." Direct posting is now in, by decision. What the original rules
+> were actually protecting — that private capture never acquires an audience — is preserved
+> structurally rather than by absence: there are two composers, the Notes one has no social
+> affordance anywhere on it, and nothing on the Notes or To-dos tabs links into the feed. The
+> failure mode to watch is unchanged and is in the table at the bottom of this page.
 
 ## What's in
 
@@ -50,6 +59,7 @@ Three rules that keep it that way:
 | Markdown folder import | expansion | 1 |
 | Profiles and handles | social | 2 |
 | **Publishing a thread to a public URL that reads without an install** | **the social wedge** | 2 |
+| **Posting straight to the feed, from the Feed tab only** | social | 2 |
 | Followers, chronological feed, likes, view counts | social, table stakes | 2 |
 | Comments, blocks, reports, moderation | social, non-negotiable once public | 2 |
 | Themes as data, custom wallpapers | customization | 2 |
@@ -93,6 +103,6 @@ Store copy, landing page, anywhere:
 | | The tell | The response |
 |---|---|---|
 | It becomes a to-do list | Due dates, overdue badges, streaks creep in | The review card has four answers including **Let go**. Guilt is the failure mode |
-| It becomes a worse Twitter | Anyone proposes a compose-to-feed box | See rule 1 above |
+| It becomes a worse Twitter | The compose-to-feed box migrates toward the Notes tab, or the feed becomes the launch screen | Two composers, two tabs, and Notes stays first. If a post ever starts life on the Notes tab, that is the tell |
 | The social layer eats the notes app | Your own private-note volume drops after R2.1 | Stop and fix the composer before building more of R2 |
 | Publishing feels like homework | Nobody publishes, including you | Fine. R2.1 is independently shippable — a private notes app with shareable links is already good |

@@ -55,9 +55,11 @@ export default function NotesList() {
   );
 
   // Only root notes are listed; updates belong inside their thread. Locked
-  // notes stay out of every list until the lock is satisfied.
+  // notes stay out of every list until the lock is satisfied, and posts written
+  // straight to the feed stay out of it entirely -- this list is the private
+  // library, and a post was never part of it.
   const rootNotes = useMemo(
-    () => notes.filter((note) => note.kind === 'note' && !note.locked),
+    () => notes.filter((note) => note.kind === 'note' && !note.locked && !note.bornPublic),
     [notes],
   );
 

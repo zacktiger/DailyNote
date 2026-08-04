@@ -52,6 +52,23 @@ export function shortDate(iso: string): string {
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
 }
 
+/**
+ * Feed ages: "now", "4m", "3h", "6d", then the date.
+ *
+ * Terse rather than "6 days ago" because it sits beside a handle in a line
+ * that is already carrying a name and an event, and because past about a week
+ * the actual date is the more useful thing anyway.
+ */
+export function sinceThen(iso: string, now: Date = new Date()): string {
+  const seconds = Math.max(0, Math.floor((now.getTime() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return 'now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+
+  const days = Math.floor(seconds / 86400);
+  return days < 7 ? `${days}d` : formatDay(iso, now);
+}
+
 /** The editor's meta line: "04/08/2026, 5:08 pm". */
 export function editedAt(iso: string): string {
   const time = new Date(iso)

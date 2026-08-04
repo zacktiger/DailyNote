@@ -37,9 +37,14 @@ export function createNote(input: NewNoteInput, now: Date): Note {
     source: input.source ?? 'composer',
     sourceRef: input.sourceRef ?? null,
 
+    // A born-public note is still created private: the feed composer publishes
+    // it as a second step, through the same path a shared note takes. One
+    // publish path means one place where "this is now public" can go wrong.
     visibility: 'private',
     publishedAt: null,
     localOnly: input.localOnly ?? false,
+    slug: null,
+    bornPublic: input.bornPublic ?? false,
 
     createdAt: timestamp,
     updatedAt: timestamp,

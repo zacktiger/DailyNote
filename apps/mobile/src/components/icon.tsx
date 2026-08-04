@@ -33,6 +33,18 @@ const FEATHER = {
   files: 'folder',
   allNotes: 'file-text',
   edit: 'edit-2',
+
+  // Social.
+  profile: 'user',
+  follow: 'user-plus',
+  following: 'user-check',
+  block: 'slash',
+  report: 'flag',
+  link: 'link-2',
+  share: 'share',
+  globe: 'globe',
+  views: 'eye',
+  refresh: 'refresh-cw',
 } as const satisfies Record<string, FeatherName>;
 
 const MATERIAL = {
@@ -44,6 +56,15 @@ const MATERIAL = {
   redo: 'redo-variant',
   pin: 'pin-outline',
   unpin: 'pin-off-outline',
+
+  // Social. The feed's tab glyph is deliberately not a bird, a bell or a
+  // house: it is a stack of pages, because what is in there is other people's
+  // notes.
+  feed: 'file-multiple-outline',
+  like: 'heart-outline',
+  liked: 'heart',
+  followedThrough: 'check-decagram-outline',
+  thread: 'comment-text-multiple-outline',
 
   // Format sheet.
   textSize: 'format-size',

@@ -38,6 +38,8 @@ export interface CreateOptions {
   parentId?: string | null;
   kind?: Note['kind'];
   notebookId?: string | null;
+  /** Set only by the feed composer. The note composer must never pass this. */
+  bornPublic?: boolean;
 }
 
 /** Client-generated UUIDs: offline-safe, and public URLs need no remap later. */
@@ -67,6 +69,8 @@ interface NoteRow {
   visibility: string;
   published_at: string | null;
   local_only: number;
+  slug: string | null;
+  born_public: number;
   created_at: string;
   updated_at: string;
   deleted: number;
@@ -95,6 +99,8 @@ function toNote(row: NoteRow): Note {
     visibility: row.visibility as Note['visibility'],
     publishedAt: row.published_at,
     localOnly: row.local_only === 1,
+    slug: row.slug,
+    bornPublic: row.born_public === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deleted: row.deleted === 1,
@@ -124,6 +130,8 @@ const COLUMNS: Record<keyof Note, string> = {
   visibility: 'visibility',
   publishedAt: 'published_at',
   localOnly: 'local_only',
+  slug: 'slug',
+  bornPublic: 'born_public',
   createdAt: 'created_at',
   updatedAt: 'updated_at',
   deleted: 'deleted',
