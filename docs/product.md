@@ -42,6 +42,7 @@ Three rules that keep it that way:
 |---|---|---|
 | Fast capture, composer as launch screen | core | 1 |
 | Inline `#hashtag` tags, search, export to markdown | core | 1 |
+| Rich text — a title that reads as one, bullet lists, per-line alignment, local images | core | 1 |
 | Share sheet and `dailynote://` URL scheme | core | 1 |
 | **The follow-through loop** — commitments, resurfacing, the four-answer review card | **the differentiator** | 1 |
 | Threads — a note plus its updates over time | core, and the R2 seam | 1 |
@@ -62,7 +63,8 @@ Three rules that keep it that way:
 | An iOS Shortcuts recipe as a shipped feature | Same ADR. The `dailynote://` half ships in Phase 2; owning a recipe against Apple's changes is a promise we're not making |
 | End-to-end encryption | Rules out server-side search and AI permanently. `local_only` notes are the pressure valve. [ADR 0002](adr/0002-no-end-to-end-encryption.md) |
 | A ranked feed | Chronological, following-only. Ranking is how this becomes a product we did not want to build |
-| Attachments, images, link unfurling | Text and URLs only through Rollout 1 |
+| Link unfurling | A note shows the URL you wrote. Fetching a page to decorate it is a network call the composer should never make |
+| Attachments other than local images | Rich text carries images stored on the device. Files, audio and video are not a note |
 | Executable themes / extensions | A theme that runs code can read your notes. Also App Store 2.5.2 |
 | Federation, monetization | Not now. Neither is a Rollout 2 question |
 
