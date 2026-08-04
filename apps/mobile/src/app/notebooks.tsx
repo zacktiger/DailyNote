@@ -9,6 +9,7 @@ import { Icon, type IconName } from '@/components/icon';
 import { Sheet } from '@/components/sheet';
 import { haptics } from '@/lib/haptics';
 import * as motion from '@/lib/motion';
+import { useGoBack } from '@/lib/nav';
 import { useNotebooks } from '@/store/notebooks-store';
 import { useNotes } from '@/store/notes-store';
 import { swatchColor, useTheme } from '@/theme';
@@ -26,6 +27,7 @@ const SWATCHES = ['swatch', 'swatchWarm', 'accent'] as const;
 export default function Notebooks() {
   const theme = useTheme();
   const router = useRouter();
+  const goBack = useGoBack();
   const { notes, refresh: refreshNotes } = useNotes();
   const { notebooks, create, remove, rename, recolor, refresh: refreshNotebooks } = useNotebooks();
 
@@ -120,7 +122,7 @@ export default function Notebooks() {
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel="Close"
-          onPress={() => router.back()}
+          onPress={goBack}
           className="h-11 w-11 items-center justify-center rounded-full active:opacity-50"
         >
           <Icon name="close" size={24} color={theme.ink} />

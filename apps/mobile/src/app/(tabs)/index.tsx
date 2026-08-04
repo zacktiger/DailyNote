@@ -2,7 +2,6 @@ import {
   ALL_NOTES,
   DEFAULT_NOTEBOOK,
   searchNotes,
-  toPlainText,
   type Note,
   type Notebook,
 } from '@dailynote/core';
@@ -280,12 +279,21 @@ function NoteRow({
   const { softDelete, togglePin } = useNotes();
   const swipeable = useRef<SwipeableMethods>(null);
 
-  // The preview is the body minus its title line, flattened to one line and
-  // stripped of formatting markers -- `## ` in a list row is noise.
-  const preview = useMemo(() => {
-    const rest = note.body.split('\n').slice(1).join(' ');
-    return toPlainText(rest).replace(/\s+/g, ' ').trim();
-  }, [note.body]);
+  // The preview is the body minus its title line, flattened to one line. The
+  // body is already the document's plain-text projection; only the bullet
+  // marker it keeps for `deriveTitle` has to come back off, since a row full
+  // of dashes reads as noise at this size.
+  const preview = useMemo(
+    () =>
+      note.body
+        .split('\n')
+        .slice(1)
+        .map((line) => line.replace(/^- /, ''))
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    [note.body],
+  );
 
   const pressed = useSharedValue(0);
   const pressStyle = useAnimatedStyle(() => ({

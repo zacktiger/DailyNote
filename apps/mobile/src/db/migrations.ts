@@ -52,7 +52,16 @@ const MIGRATIONS: readonly ((db: SQLiteDatabase) => Promise<void>)[] = [
     `);
   },
 
-  // v2 -- notebooks
+  // v2 -- the block document behind rich text.
+  //
+  // Nullable with no backfill: a null `doc` is a plain-text note, which the
+  // client reads as a document of paragraphs. `body` remains the plain-text
+  // projection, so every existing read path is untouched.
+  async (db) => {
+    await db.execAsync('alter table notes add column doc text;');
+  },
+
+  // v3 -- notebooks, locking and pinning.
   //
   // A note with a null notebook_id is in the Default notebook. Modelling the
   // default as "no row" rather than a seeded row means there is no per-install
@@ -64,7 +73,7 @@ const MIGRATIONS: readonly ((db: SQLiteDatabase) => Promise<void>)[] = [
         id          text primary key not null,
         user_id     text,
         name        text not null,
-        /** Palette key, not a hex value: notebooks re-theme with the app. */
+        -- Palette key, not a hex value: notebooks re-theme with the app.
         color       text not null default 'swatch',
         sort_order  integer not null default 0,
 
@@ -76,10 +85,10 @@ const MIGRATIONS: readonly ((db: SQLiteDatabase) => Promise<void>)[] = [
       alter table notes add column notebook_id text
         references notebooks(id) on delete set null;
 
-      /** Notes hidden behind the device lock. See lib/lock.ts. */
+      -- Notes hidden behind the device lock. See lib/lock.ts.
       alter table notes add column locked integer not null default 0;
 
-      /** Manual pin to the top of the list, independent of updated_at. */
+      -- Manual pin to the top of the list, independent of updated_at.
       alter table notes add column pinned_at text;
 
       create index notes_notebook_idx on notes (notebook_id);

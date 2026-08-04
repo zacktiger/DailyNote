@@ -1,19 +1,16 @@
 import {
-  applyBlockStyle,
-  applyListStyle,
-  changeIndent,
-  characterCount,
-  continueList,
-  toggleInlineMark,
+  documentToText,
+  insertImage,
+  isEmptyDocument,
+  parseDocument,
+  serializeDocument,
+  setAlign,
+  toggleBullet,
   type Align,
-  type BlockStyle,
-  type Edit,
-  type InlineMark,
-  type ListStyle,
+  type Block,
   type Note,
-  type Selection,
 } from '@dailynote/core';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -22,34 +19,31 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
-  type NativeSyntheticEvent,
-  type TextInputSelectionChangeEventData,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BlockEditor, type BlockEditorHandle } from '@/components/block-editor';
 import { FormatSheet } from '@/components/format-sheet';
 import { Icon, type IconName } from '@/components/icon';
-import { Sheet, SheetButton } from '@/components/sheet';
+import { Sheet } from '@/components/sheet';
+import { canAttachImages, pickImage } from '@/lib/attachments';
 import { editedAt } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { useGoBack } from '@/lib/nav';
 import { useHistory } from '@/lib/undo';
 import { useNotebooks } from '@/store/notebooks-store';
 import { useNotes } from '@/store/notes-store';
 import { useTheme } from '@/theme';
 
-/** How long after the last keystroke the note is written to SQLite. */
-const AUTOSAVE_MS = 800;
+/** How long the writing has to stop before an edit is written to SQLite. */
+const AUTOSAVE_MS = 600;
 
 export default function NoteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { notes, loading } = useNotes();
 
-  const note = useMemo(
-    () => notes.find((candidate) => candidate.id === id) ?? null,
-    [notes, id],
-  );
+  const note = useMemo(() => notes.find((candidate) => candidate.id === id) ?? null, [notes, id]);
 
   if (id !== 'new' && note === null) {
     // Still loading is not the same as gone, and rendering "gone" over a note
@@ -57,17 +51,17 @@ export default function NoteScreen() {
     return loading ? <View className="flex-1 bg-paper dark:bg-paper-dark" /> : <Missing />;
   }
 
-  // Keyed so the draft initialises from the stored body exactly once. Store
-  // refreshes must never clobber what is being typed.
+  // Keyed so the document initialises from storage exactly once, on mount.
+  // Store refreshes must never clobber what is being typed.
   return <Editor key={id} note={note} />;
 }
 
 function Missing() {
-  const router = useRouter();
+  const goBack = useGoBack();
   return (
     <SafeAreaView className="flex-1 items-center justify-center bg-paper dark:bg-paper-dark">
       <Text className="text-[17px] text-muted dark:text-muted-dark">This note is gone.</Text>
-      <Pressable onPress={() => router.back()} className="mt-4 active:opacity-60">
+      <Pressable onPress={goBack} className="mt-4 active:opacity-60">
         <Text className="text-[15px] font-medium text-accent dark:text-accent-dark">Go back</Text>
       </Pressable>
     </SafeAreaView>
@@ -75,185 +69,147 @@ function Missing() {
 }
 
 /**
- * The note editor.
+ * The note editor: the reference's chrome around the block writing surface.
  *
- * The title is the body's first line rather than a separate column, which is
- * what keeps `deriveTitle` honest -- renaming the note and editing its first
- * line are the same act. The two TextInputs are a presentation split over one
- * string, joined on every keystroke.
+ * The screen owns saving, undo and the menus; `BlockEditor` owns the caret and
+ * the structure of the document. Undo is over whole documents rather than over
+ * text, because every edit in the block model already produces a new `Block[]`.
  */
 function Editor({ note }: { note: Note | null }) {
   const theme = useTheme();
-  const router = useRouter();
-  const { create, setBody, softDelete, promote, move, togglePin, setLocked } = useNotes();
+  const goBack = useGoBack();
+  const { create, setContent, softDelete, promote, move, togglePin, setLocked } = useNotes();
   const { notebooks, find } = useNotebooks();
 
-  const stored = note?.body ?? '';
-  const [title, setTitle] = useState(() => stored.split('\n')[0] ?? '');
-  const history = useHistory(stored.split('\n').slice(1).join('\n'));
-  const [align, setAlign] = useState<Align>('left');
+  const history = useHistory<Block[]>(
+    useMemo(() => parseDocument(note?.doc, note?.body ?? ''), [note?.doc, note?.body]),
+  );
+  const blocks = history.value;
 
-  const [selection, setSelection] = useState<Selection>({ start: 0, end: 0 });
-  const [pending, setPending] = useState<Selection | null>(null);
-  const [sheet, setSheet] = useState<'format' | 'add' | 'more' | 'notebook' | null>(null);
+  const [focused, setFocused] = useState<number | null>(null);
+  const [sheet, setSheet] = useState<'format' | 'more' | 'notebook' | null>(null);
+  const editor = useRef<BlockEditorHandle>(null);
 
-  const bodyRef = useRef<TextInput>(null);
   // The id is only known after the first save for a brand new note.
   const noteId = useRef<string | null>(note?.id ?? null);
-  const savedRef = useRef(stored);
   const [editedIso, setEditedIso] = useState(note?.updatedAt ?? new Date().toISOString());
 
-  const body = history.value;
-  const composed = useMemo(
-    () => (body.length > 0 ? `${title}\n${body}` : title),
-    [title, body],
-  );
-
   const notebook = find(note?.notebookId ?? null);
-  const count = characterCount(composed);
+  const count = useMemo(
+    () => documentToText(blocks).replace(/\s/g, '').length,
+    [blocks],
+  );
 
   // --- persistence ---------------------------------------------------------
 
-  const persist = useCallback(
-    async (text: string) => {
-      if (text === savedRef.current) return;
-      if (text.trim().length === 0 && noteId.current === null) return;
+  const saved = useRef(note === null ? null : serializeDocument(parseDocument(note.doc, note.body)));
 
-      savedRef.current = text;
+  const persist = useCallback(
+    async (next: readonly Block[]) => {
+      const serialized = serializeDocument(next);
+      if (serialized === saved.current) return;
+      // A new note is not written until it has content, so backing out of an
+      // empty editor leaves nothing behind.
+      if (noteId.current === null && isEmptyDocument(next)) return;
+
+      saved.current = serialized;
       if (noteId.current === null) {
-        // A new note is not written until it has content, so backing out of an
-        // empty editor leaves nothing behind.
-        const created = await create(text);
+        const created = await create(documentToText(next), { doc: serialized });
         noteId.current = created.id;
       } else {
-        await setBody(noteId.current, text);
+        await setContent(noteId.current, next);
       }
       setEditedIso(new Date().toISOString());
     },
-    [create, setBody],
+    [create, setContent],
   );
 
   // Debounced autosave. There is no Save button in the reference and there is
   // none here: leaving the screen is what commits, and this covers a crash.
   useEffect(() => {
-    const timer = setTimeout(() => void persist(composed), AUTOSAVE_MS);
+    const timer = setTimeout(() => void persist(blocks), AUTOSAVE_MS);
     return () => clearTimeout(timer);
-  }, [composed, persist]);
+  }, [blocks, persist]);
 
-  // Tracked in a ref so the unmount flush below can read the latest text
-  // without re-subscribing -- an unmount cleanup that depended on `composed`
-  // would fire on every keystroke instead of on the way out.
-  const composedRef = useRef(composed);
+  // Kept in a ref so the unmount flush can stay on empty deps: an effect
+  // depending on `blocks` would fire its cleanup on every keystroke.
+  const latest = useRef(blocks);
   useEffect(() => {
-    composedRef.current = composed;
-  }, [composed]);
+    latest.current = blocks;
+  }, [blocks]);
 
+  const persistRef = useRef(persist);
   useEffect(() => {
-    // Flush on unmount, so backing out never loses the last few characters.
-    return () => {
-      void persist(composedRef.current);
-    };
+    persistRef.current = persist;
   }, [persist]);
+
+  useEffect(() => {
+    return () => {
+      void persistRef.current(latest.current);
+    };
+  }, []);
 
   // --- editing -------------------------------------------------------------
 
-  /** Applies a transform, recording it as its own undo step. */
+  const change = useCallback((next: Block[]) => history.set(next), [history]);
+
+  /** A toolbar edit: its own undo step, and the caret goes back to the note. */
   const apply = useCallback(
-    (edit: Edit | null) => {
-      if (edit === null) return;
-      history.set(edit.text, edit.selection, { discrete: true });
-      setSelection(edit.selection);
-      setPending(edit.selection);
+    (next: Block[]) => {
+      history.set(next, { discrete: true });
+      editor.current?.restoreFocus();
     },
     [history],
   );
 
-  const onChangeBody = useCallback(
-    (next: string) => {
-      const previous = history.value;
-
-      // Enter inside a list continues it. Detected by diffing rather than
-      // onKeyPress, which does not fire reliably for Enter on Android.
-      if (next.length === previous.length + 1) {
-        const at = selection.start;
-        const isNewlineHere =
-          next[at] === '\n' &&
-          next.slice(0, at) === previous.slice(0, at) &&
-          next.slice(at + 1) === previous.slice(at);
-
-        if (isNewlineHere) {
-          const continued = continueList(previous, { start: at, end: at });
-          if (continued !== null) {
-            apply(continued);
-            return;
-          }
-        }
-      }
-
-      history.set(next, selection);
-    },
-    [history, selection, apply],
-  );
-
-  const onSelectionChange = useCallback(
-    (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-      setSelection(event.nativeEvent.selection);
-      // Release the controlled selection once the input has honoured it, so
-      // it does not fight the caret on the next keystroke.
-      setPending(null);
-    },
-    [],
-  );
-
   const undo = useCallback(() => {
-    const entry = history.undo();
-    if (entry !== null) {
-      setSelection(entry.selection);
-      setPending(entry.selection);
-      haptics.tap();
-    }
+    if (history.undo() !== null) haptics.tap();
   }, [history]);
 
   const redo = useCallback(() => {
-    const entry = history.redo();
-    if (entry !== null) {
-      setSelection(entry.selection);
-      setPending(entry.selection);
-      haptics.tap();
-    }
+    if (history.redo() !== null) haptics.tap();
   }, [history]);
 
-  const onBlockStyle = useCallback(
-    (style: BlockStyle) => apply(applyBlockStyle(history.value, selection, style)),
-    [apply, history.value, selection],
-  );
-  const onList = useCallback(
-    (list: ListStyle) => apply(applyListStyle(history.value, selection, list)),
-    [apply, history.value, selection],
-  );
-  const onMark = useCallback(
-    (mark: InlineMark) => apply(toggleInlineMark(history.value, selection, mark)),
-    [apply, history.value, selection],
-  );
-  const onIndent = useCallback(
-    (delta: number) => apply(changeIndent(history.value, selection, delta)),
-    [apply, history.value, selection],
+  // The toolbar acts on the focused block, or on the last one when the caret
+  // has left the note -- pressing a format button should never do nothing.
+  const target = focused ?? blocks.length - 1;
+  const targetBlock = blocks[target];
+
+  const onToggleBullet = useCallback(() => {
+    haptics.tap();
+    apply(toggleBullet(blocks, target));
+  }, [apply, blocks, target]);
+
+  const onAlign = useCallback(
+    (align: Align) => {
+      haptics.tap();
+      apply(setAlign(blocks, target, align));
+    },
+    [apply, blocks, target],
   );
 
-  /** The checklist button on the main toolbar, as in the reference. */
-  const toggleChecklist = useCallback(() => {
-    haptics.tap();
-    onList('checklist');
-    bodyRef.current?.focus();
-  }, [onList]);
+  const onAddImage = useCallback(() => {
+    setSheet(null);
+    void (async () => {
+      const block = await pickImage();
+      if (block === null) return;
+      haptics.success();
+      apply(insertImage(blocks, focused, block));
+    })();
+  }, [apply, blocks, focused]);
 
   // --- actions -------------------------------------------------------------
 
   const done = useCallback(async () => {
     haptics.tap();
-    await persist(composed);
-    router.back();
-  }, [persist, composed, router]);
+    await persist(blocks);
+    goBack();
+  }, [persist, blocks, goBack]);
+
+  const requireSaved = useCallback(async () => {
+    await persist(blocks);
+    return noteId.current;
+  }, [persist, blocks]);
 
   const confirmDelete = useCallback(() => {
     setSheet(null);
@@ -265,20 +221,16 @@ function Editor({ note }: { note: Note | null }) {
         onPress: () => {
           void (async () => {
             haptics.tap();
-            // Nothing to delete if it was never saved.
-            savedRef.current = composed;
+            // Nothing to delete if it was never saved; block the unmount flush
+            // from writing it back on the way out.
+            saved.current = serializeDocument(blocks);
             if (noteId.current !== null) await softDelete(noteId.current);
-            router.back();
+            goBack();
           })();
         },
       },
     ]);
-  }, [softDelete, router, composed]);
-
-  const requireSaved = useCallback(async () => {
-    await persist(composed);
-    return noteId.current;
-  }, [persist, composed]);
+  }, [softDelete, goBack, blocks]);
 
   return (
     <SafeAreaView className="flex-1 bg-paper dark:bg-paper-dark" edges={['top', 'left', 'right']}>
@@ -307,39 +259,17 @@ function Editor({ note }: { note: Note | null }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerClassName="pb-12"
+          contentContainerClassName="pb-12 pt-3"
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
         >
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
+          <BlockEditor
+            ref={editor}
+            blocks={blocks}
+            onChange={change}
+            onFocusChange={setFocused}
             placeholder="Heading"
-            placeholderTextColor={theme.faint}
-            selectionColor={theme.accent}
-            cursorColor={theme.accent}
-            multiline
-            textAlign={align}
-            submitBehavior="submit"
-            onSubmitEditing={() => bodyRef.current?.focus()}
-            className="px-5 pt-4 text-[30px] font-bold leading-9 text-ink web:outline-none dark:text-ink-dark"
-          />
-
-          <TextInput
-            ref={bodyRef}
-            value={body}
-            onChangeText={onChangeBody}
-            onSelectionChange={onSelectionChange}
-            selection={pending ?? undefined}
             autoFocus={note === null}
-            multiline
-            textAlign={align}
-            textAlignVertical="top"
-            placeholder="Start writing"
-            placeholderTextColor={theme.faint}
-            selectionColor={theme.accent}
-            cursorColor={theme.accent}
-            className="min-h-[320px] px-5 pt-3 text-[17px] leading-7 text-ink web:outline-none dark:text-ink-dark"
           />
         </ScrollView>
 
@@ -351,28 +281,33 @@ function Editor({ note }: { note: Note | null }) {
             onPress={() => setSheet('format')}
             tint={theme.accent}
           />
-          <ToolbarIcon name="checklist" label="Checklist" onPress={toggleChecklist} />
-          <ToolbarIcon name="bulletList" label="Bullets" onPress={() => onList('bullet')} />
-          <ToolbarIcon name="numberedList" label="Numbers" onPress={() => onList('numbered')} />
-          <ToolbarIcon name="add" label="Add" onPress={() => setSheet('add')} />
+          <ToolbarIcon
+            name="bulletList"
+            label="Bullet list"
+            onPress={onToggleBullet}
+            tint={
+              targetBlock !== undefined && targetBlock.type === 'bullet' ? theme.accent : undefined
+            }
+          />
+          <ToolbarIcon name="alignLeft" label="Align left" onPress={() => onAlign('left')} />
+          <ToolbarIcon name="alignCenter" label="Align centre" onPress={() => onAlign('center')} />
+          <ToolbarIcon
+            name="photos"
+            label="Add photo"
+            onPress={onAddImage}
+            disabled={!canAttachImages}
+          />
         </View>
       </KeyboardAvoidingView>
 
       <FormatSheet
         visible={sheet === 'format'}
         onClose={() => setSheet(null)}
-        text={body}
-        selection={selection}
-        onEdit={apply}
-        align={align}
-        onAlign={setAlign}
-        onBlockStyle={onBlockStyle}
-        onList={onList}
-        onMark={onMark}
-        onIndent={onIndent}
+        block={targetBlock}
+        onToggleBullet={onToggleBullet}
+        onAlign={onAlign}
+        onAddImage={onAddImage}
       />
-
-      <AddSheet visible={sheet === 'add'} onClose={() => setSheet(null)} />
 
       <Sheet visible={sheet === 'more'} onClose={() => setSheet(null)} title="Note">
         <View className="pb-2">
@@ -414,7 +349,7 @@ function Editor({ note }: { note: Note | null }) {
                 const id = await requireSaved();
                 if (id !== null) {
                   await setLocked(id, true);
-                  router.back();
+                  goBack();
                 }
               })();
             }}
@@ -455,43 +390,6 @@ function Editor({ note }: { note: Note | null }) {
         </ScrollView>
       </Sheet>
     </SafeAreaView>
-  );
-}
-
-/**
- * The attachment panel.
- *
- * Photos, Camera and Files are inert for now: the body is a plain-text string,
- * and putting real attachments in it needs a store for the files plus an
- * editor that can render them inline -- neither of which exists yet. The panel
- * is here because it is part of the screen's shape, and it says so plainly
- * rather than failing silently when tapped.
- */
-function AddSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const items: readonly { icon: IconName; label: string }[] = [
-    { icon: 'photos', label: 'Photos' },
-    { icon: 'camera', label: 'Camera' },
-    { icon: 'doodle', label: 'Doodle' },
-    { icon: 'spreadsheet', label: 'Spreadsheet' },
-    { icon: 'files', label: 'Files' },
-  ];
-
-  return (
-    <Sheet visible={visible} onClose={onClose} title="Add">
-      <View className="flex-row flex-wrap gap-4 px-5 pb-2">
-        {items.map((item) => (
-          <View key={item.label} className="w-[21%] items-center">
-            <SheetButton icon={item.icon} label={item.label} disabled onPress={() => {}} flex={false} />
-            <Text className="pt-1.5 text-center text-[12px] text-faint dark:text-faint-dark">
-              {item.label}
-            </Text>
-          </View>
-        ))}
-      </View>
-      <Text className="px-5 pb-2 pt-2 text-[13px] text-faint dark:text-faint-dark">
-        Attachments are not available yet.
-      </Text>
-    </Sheet>
   );
 }
 

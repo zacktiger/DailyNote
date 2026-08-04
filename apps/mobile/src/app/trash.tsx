@@ -1,5 +1,4 @@
 import type { Note } from '@dailynote/core';
-import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -9,6 +8,7 @@ import { Icon } from '@/components/icon';
 import { shortDate } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import * as motion from '@/lib/motion';
+import { useGoBack } from '@/lib/nav';
 import { useNotes } from '@/store/notes-store';
 import { useTheme } from '@/theme';
 
@@ -20,7 +20,7 @@ import { useTheme } from '@/theme';
  */
 export default function Trash() {
   const theme = useTheme();
-  const router = useRouter();
+  const goBack = useGoBack();
   const { notes, restore, purge, purgeAll } = useNotes();
 
   const deleted = useMemo(
@@ -56,7 +56,7 @@ export default function Trash() {
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel="Back"
-          onPress={() => router.back()}
+          onPress={goBack}
           className="h-11 w-11 items-center justify-center rounded-full active:opacity-50"
         >
           <Icon name="back" size={24} color={theme.ink} />

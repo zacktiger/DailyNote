@@ -27,13 +27,28 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#faf9f5",
-          "dark": { "backgroundColor": "#121110" },
+          "backgroundColor": "#f7f5f0",
+          "dark": {
+            "backgroundColor": "#000000"
+          },
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "DailyNote adds the photos you pick to the note you are writing. They are copied into the app and stay on this device."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "DailyNote uses Face ID to open notes you have locked."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

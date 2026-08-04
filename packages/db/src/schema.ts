@@ -31,9 +31,12 @@ export const notes = pgTable(
     /** Nullable until Phase 4 -- the app is usable with no account at all. */
     userId: uuid('user_id').references(() => authUsers.id, { onDelete: 'cascade' }),
 
+    /** The plain-text projection of `doc`. What search and sync read. */
     body: text('body').notNull(),
     /** Derived from the first line and cached. */
     title: text('title'),
+    /** The block document as JSON. Null for a plain-text note. */
+    doc: text('doc'),
 
     // --- threading / follow-through ---
     /** Equals `id` for a root note. */

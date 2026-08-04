@@ -21,6 +21,13 @@ export interface Note {
   body: string;
   /** Derived from the first line and cached. See `deriveTitle`. */
   title: string | null;
+  /**
+   * The block document, serialized. Null for a plain-text note -- every note
+   * written before rich text existed, and every note created outside the
+   * composer. `body` is always the plain-text projection of this. See
+   * `document.ts`.
+   */
+  doc: string | null;
 
   // --- filing ---
   /** Null means the Default notebook, which is the absence of a notebook. */
@@ -67,6 +74,8 @@ export interface Note {
 export interface NewNoteInput {
   id: string;
   body: string;
+  /** The block document. Omit for a plain-text note. */
+  doc?: string | null;
   source?: NoteSource;
   sourceRef?: string | null;
   localOnly?: boolean;

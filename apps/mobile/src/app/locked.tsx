@@ -9,6 +9,7 @@ import { shortDate } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { authenticate } from '@/lib/lock';
 import * as motion from '@/lib/motion';
+import { useGoBack } from '@/lib/nav';
 import { useNotes } from '@/store/notes-store';
 import { useTheme } from '@/theme';
 
@@ -23,6 +24,7 @@ type Gate = 'checking' | 'locked' | 'open' | 'unavailable';
 export default function Locked() {
   const theme = useTheme();
   const router = useRouter();
+  const goBack = useGoBack();
   const { notes, setLocked } = useNotes();
   const [gate, setGate] = useState<Gate>('checking');
   // Bumped by the Unlock button to re-run the prompt after a refusal.
@@ -58,7 +60,7 @@ export default function Locked() {
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel="Back"
-          onPress={() => router.back()}
+          onPress={goBack}
           className="h-11 w-11 items-center justify-center rounded-full active:opacity-50"
         >
           <Icon name="back" size={24} color={theme.ink} />

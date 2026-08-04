@@ -1,4 +1,4 @@
-import type { Note, ReviewAnswer } from '@dailynote/core';
+import type { Block, Note, ReviewAnswer } from '@dailynote/core';
 import { applyReview, promoteToCommitment } from '@dailynote/core';
 import { useSQLiteContext } from 'expo-sqlite';
 import {
@@ -28,6 +28,7 @@ interface NotesContextValue {
   refresh: () => Promise<void>;
   create: (body: string, options?: CreateOptions) => Promise<Note>;
   setBody: (id: string, body: string) => Promise<void>;
+  setContent: (id: string, blocks: readonly Block[]) => Promise<void>;
   softDelete: (id: string) => Promise<void>;
   restore: (id: string) => Promise<void>;
   purge: (id: string) => Promise<void>;
@@ -85,6 +86,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
       async setBody(id, body) {
         await repo.setBody(id, body);
+        await refresh();
+      },
+
+      async setContent(id, blocks) {
+        await repo.setContent(id, blocks);
         await refresh();
       },
 

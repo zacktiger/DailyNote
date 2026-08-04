@@ -146,8 +146,9 @@ wiring instead of migration.
 create table notes (
   id            uuid primary key,              -- client-generated, offline-safe
   user_id       uuid references auth.users,    -- nullable pre-auth (Phase 1-3)
-  body          text not null,
+  body          text not null,                 -- plain-text projection of doc
   title         text,                          -- derived from first line, cached
+  doc           text,                          -- block document as JSON; null = plain text
 
   -- threading / follow-through
   root_id       uuid not null,                 -- == id for a root note
@@ -195,7 +196,16 @@ Notes on the model:
   rows out of the outbound set entirely.
 - `deleted` (not `deleted_at`) because Legend-State's `changesSince: 'last-sync'` expects a
   soft-delete flag it can filter on.
-- Attachments, images, and link unfurling are **out of Rollout 1.** Text and URLs only.
+- **`doc` holds the block document; `body` is its plain-text projection.** A note is a list of
+  blocks (paragraph, bullet, image), each with an alignment, serialized into `doc` by
+  `@dailynote/core`'s document module. `body` is rewritten from it on every edit, so search,
+  `#hashtag` parsing, `deriveTitle` and the sync cursor keep reading one plain string and never
+  learn about blocks. A null `doc` is a plain-text note and parses back as paragraphs, which is
+  why rich text needed no backfill.
+- **Local images are in Rollout 1; other attachments and link unfurling are not.** A picked photo
+  is copied into `documentDirectory/attachments/` and the note stores the *relative* path — the
+  iOS app container moves between installs. Nothing is uploaded: there is no Storage bucket, and
+  how attachments sync is a Phase 4 question, not one this answers.
 
 ### RLS
 
@@ -224,7 +234,8 @@ Do not build CRDTs for Rollout 1.
 
 ```
 /apps/mobile          expo app, expo-router
-/packages/core        pure TS: hashtag parsing, review scheduler, title derivation, search ranking
+/packages/core        pure TS: hashtag parsing, review scheduler, title derivation, search ranking,
+                      the block document (parse, serialize, project to text, edit)
 /packages/db          drizzle schema (pg), migrations, shared zod types
 /supabase             migrations, RLS policies, seed data
 /docs                 ADRs, this plan
