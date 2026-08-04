@@ -7,6 +7,7 @@ import {
   paragraph,
   parseDocument,
   serializeDocument,
+  toggleBullet,
   type Block,
 } from './document';
 import { parseHashtags } from './hashtags';
@@ -111,6 +112,42 @@ describe('documentToText', () => {
 
   it('leaves hashtags where the parser can still find them', () => {
     expect(parseHashtags(documentToText([paragraph('call the dentist #do')]))).toEqual(['do']);
+  });
+});
+
+describe('toggleBullet', () => {
+  it('turns a paragraph into a bullet and back', () => {
+    const blocks = [paragraph('milk')];
+
+    const bulleted = toggleBullet(blocks, 0);
+    expect(bulleted[0]!.type).toBe('bullet');
+    expect(toggleBullet(bulleted, 0)[0]!.type).toBe('paragraph');
+  });
+
+  it('keeps the text and the alignment', () => {
+    const [toggled] = toggleBullet([paragraph('milk', 'center')], 0);
+
+    expect(toggled).toMatchObject({ text: 'milk', align: 'center' });
+  });
+
+  it('leaves the rest of the document alone', () => {
+    const blocks = [paragraph('Groceries'), paragraph('milk'), paragraph('oats')];
+
+    expect(documentToText(toggleBullet(blocks, 1))).toBe('Groceries\n- milk\noats');
+  });
+
+  it('is a no-op on an image or an index that is not there', () => {
+    const blocks = [image('attachments/a.jpg', 10, 10)];
+
+    expect(toggleBullet(blocks, 0)[0]!.type).toBe('image');
+    expect(toggleBullet(blocks, 7)).toHaveLength(1);
+  });
+
+  it('does not mutate the document it was given', () => {
+    const blocks = [paragraph('milk')];
+    toggleBullet(blocks, 0);
+
+    expect(blocks[0]!.type).toBe('paragraph');
   });
 });
 

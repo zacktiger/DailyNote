@@ -1,4 +1,4 @@
-import { parseDocument, threadOf, type Block, type Note } from '@dailynote/core';
+import { parseDocument, threadOf, toggleBullet, type Block, type Note } from '@dailynote/core';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { BlockEditor } from '@/components/block-editor';
+import { BlockEditor, type BlockEditorHandle } from '@/components/block-editor';
+import { BlockToolbar } from '@/components/block-toolbar';
 import { comesBack, formatDay } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import * as motion from '@/lib/motion';
@@ -48,6 +49,8 @@ function NoteEditor({ note }: { note: Note }) {
   const router = useRouter();
   const { notes, setContent, softDelete, promote } = useNotes();
   const [blocks, setBlocks] = useState<Block[]>(() => parseDocument(note.doc, note.body));
+  const [focused, setFocused] = useState<number | null>(null);
+  const editor = useRef<BlockEditorHandle>(null);
 
   // Autosave, because there is no longer one input whose blur means "done":
   // with a block per line, blur fires every time the caret moves between them.
@@ -126,7 +129,13 @@ function NoteEditor({ note }: { note: Note }) {
           {formatDay(note.createdAt)}
         </Text>
 
-        <BlockEditor blocks={blocks} onChange={change} placeholder="Untitled" />
+        <BlockEditor
+          ref={editor}
+          blocks={blocks}
+          onChange={change}
+          onFocusChange={setFocused}
+          placeholder="Untitled"
+        />
 
         {/* The follow-through loop's entry point. Promoting crossfades the
             pill into the status with a spring reflow and the app's single
@@ -185,6 +194,17 @@ function NoteEditor({ note }: { note: Note }) {
           </View>
         ) : null}
       </ScrollView>
+
+      <BlockToolbar
+        block={focused === null ? undefined : blocks[focused]}
+        onToggleBullet={() => {
+          if (focused === null) return;
+          change(toggleBullet(blocks, focused));
+          // The toolbar took the tap; give the caret straight back so the
+          // keyboard never drops and the next word goes where it should.
+          editor.current?.restoreFocus();
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }

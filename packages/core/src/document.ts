@@ -176,6 +176,22 @@ export function documentToText(blocks: readonly Block[]): string {
     .join('\n');
 }
 
+/**
+ * Turns the block at `index` into a bullet, or back into a paragraph.
+ *
+ * Lives here rather than in the editor so the toolbar's effect on a document
+ * is testable without a simulator. Out-of-range and image blocks are no-ops:
+ * the toolbar can be pressed at any time, and it should never throw.
+ */
+export function toggleBullet(blocks: readonly Block[], index: number): Block[] {
+  const block = blocks[index];
+  if (block === undefined || !isTextBlock(block)) return [...blocks];
+
+  const next = [...blocks];
+  next[index] = { ...block, type: block.type === 'bullet' ? 'paragraph' : 'bullet' };
+  return next;
+}
+
 /** True when there is nothing worth saving: no image, and no non-blank text. */
 export function isEmptyDocument(blocks: readonly Block[]): boolean {
   return blocks.every((block) => isTextBlock(block) && block.text.trim().length === 0);

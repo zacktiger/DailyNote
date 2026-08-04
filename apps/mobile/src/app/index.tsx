@@ -5,6 +5,7 @@ import {
   paragraph,
   parseHashtags,
   serializeDocument,
+  toggleBullet,
   type Block,
 } from '@dailynote/core';
 import { Link } from 'expo-router';
@@ -26,7 +27,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BlockEditor } from '@/components/block-editor';
+import { BlockEditor, type BlockEditorHandle } from '@/components/block-editor';
+import { BlockToolbar } from '@/components/block-toolbar';
 import { todayHeading } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import * as motion from '@/lib/motion';
@@ -45,6 +47,8 @@ export default function Composer() {
   const theme = useTheme();
   const { create, promote, notes } = useNotes();
   const [blocks, setBlocks] = useState<Block[]>(() => [paragraph()]);
+  const [focused, setFocused] = useState<number | null>(null);
+  const editor = useRef<BlockEditorHandle>(null);
   const [saving, setSaving] = useState(false);
   // Bumped after a save: remounting the editor is what clears it and returns
   // the caret to a fresh title, since autoFocus only fires on mount.
@@ -162,8 +166,10 @@ export default function Composer() {
           >
             <BlockEditor
               key={draft}
+              ref={editor}
               blocks={blocks}
               onChange={setBlocks}
+              onFocusChange={setFocused}
               placeholder="What's on your mind?"
               autoFocus
             />
@@ -209,6 +215,17 @@ export default function Composer() {
               </Animated.View>
             ) : null}
           </Animated.View>
+
+          <BlockToolbar
+            block={focused === null ? undefined : blocks[focused]}
+            onToggleBullet={() => {
+              if (focused === null) return;
+              setBlocks(toggleBullet(blocks, focused));
+              // The toolbar took the tap; give the caret straight back so the
+              // keyboard never drops and the next word goes where it should.
+              editor.current?.restoreFocus();
+            }}
+          />
         </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
