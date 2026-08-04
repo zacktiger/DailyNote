@@ -80,30 +80,29 @@ export function FeedCard({
   const name = item.displayName ?? `@${item.handle}`;
   const completed = event === 'followed-through';
 
+  // Three sibling targets rather than one card with controls nested inside it:
+  // the byline goes to the author, the body goes to the thread, and the like
+  // acts in place. Nesting them made a button inside a button -- invalid on the
+  // web surface, and a screen reader announcing one row as a single control
+  // with mystery children on every platform.
   return (
     <View className="px-4">
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${name}, ${feedEventLabel(event)}: ${feedTitle(item)}`}
-        onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.id } })}
+      <View
         className={[
-          'bg-card px-4 active:opacity-70 dark:bg-card-dark',
+          'bg-card px-4 dark:bg-card-dark',
           first ? 'rounded-t-2xl pt-4' : 'pt-3.5',
           last ? 'rounded-b-2xl pb-3' : 'pb-3',
         ].join(' ')}
       >
-        <View className="flex-row items-center gap-2.5">
-          <Pressable
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel={`${name}'s profile`}
-            onPress={() =>
-              router.push({ pathname: '/profile/[handle]', params: { handle: item.handle } })
-            }
-            className="active:opacity-60"
-          >
-            <Avatar profile={item} size={34} />
-          </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${name}, @${item.handle}`}
+          onPress={() =>
+            router.push({ pathname: '/profile/[handle]', params: { handle: item.handle } })
+          }
+          className="flex-row items-center gap-2.5 active:opacity-60"
+        >
+          <Avatar profile={item} size={34} />
 
           <View className="flex-1">
             <Text numberOfLines={1} className="text-[15px] text-ink dark:text-ink-dark">
@@ -118,22 +117,30 @@ export function FeedCard({
             </Text>
           </View>
 
-          {completed ? (
-            <Icon name="followedThrough" size={19} color={theme.accent} />
-          ) : null}
-        </View>
+          {completed ? <Icon name="followedThrough" size={19} color={theme.accent} /> : null}
+        </Pressable>
 
-        <Text
-          numberOfLines={2}
-          className="pt-3 font-serif text-[19px] leading-6 text-ink dark:text-ink-dark"
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${feedEventLabel(event)}: ${feedTitle(item)}`}
+          onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.id } })}
+          className="active:opacity-70"
         >
-          {feedTitle(item)}
-        </Text>
-        {preview.length > 0 ? (
-          <Text numberOfLines={2} className="pt-1 text-[15px] leading-5 text-muted dark:text-muted-dark">
-            {preview}
+          <Text
+            numberOfLines={2}
+            className="pt-3 font-serif text-[19px] leading-6 text-ink dark:text-ink-dark"
+          >
+            {feedTitle(item)}
           </Text>
-        ) : null}
+          {preview.length > 0 ? (
+            <Text
+              numberOfLines={2}
+              className="pt-1 text-[15px] leading-5 text-muted dark:text-muted-dark"
+            >
+              {preview}
+            </Text>
+          ) : null}
+        </Pressable>
 
         <View className="flex-row items-center gap-4 pt-3">
           <LikeButton item={item} onPress={onLike} />
@@ -146,7 +153,7 @@ export function FeedCard({
           ) : null}
           {item.viewCount > 0 ? <Stat icon="views" label={String(item.viewCount)} /> : null}
         </View>
-      </Pressable>
+      </View>
 
       {!last ? <View className="mx-4 h-px bg-line dark:bg-line-dark" /> : null}
     </View>
