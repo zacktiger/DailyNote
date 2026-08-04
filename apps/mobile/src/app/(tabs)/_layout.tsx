@@ -4,11 +4,15 @@ import { Icon } from '@/components/icon';
 import { useTheme } from '@/theme';
 
 /**
- * Notes and To-dos, the reference's two tabs.
+ * Notes, To-dos and the Feed.
  *
  * To-dos is not a second store: a to-do is a note that has been promoted to a
  * commitment, so the tab is a view over the same table rather than a parallel
  * feature with its own data.
+ *
+ * Feed is last, and that ordering is load-bearing. The app opens on Notes; the
+ * social layer is somewhere you go, not somewhere you land. Nothing on the
+ * first two tabs links into the third.
  */
 export default function TabsLayout() {
   const theme = useTheme();
@@ -42,6 +46,13 @@ export default function TabsLayout() {
         options={{
           title: 'To-dos',
           tabBarIcon: ({ color }) => <Icon name="todos" size={20} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="social"
+        options={{
+          title: 'Feed',
+          tabBarIcon: ({ color }) => <Icon name="feed" size={21} color={color} />,
         }}
       />
     </Tabs>

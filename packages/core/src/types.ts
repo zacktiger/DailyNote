@@ -57,11 +57,23 @@ export interface Note {
   /** URL, package name or file path, depending on `source`. */
   sourceRef: string | null;
 
-  // --- publishing (Rollout 2 seam; unused in Rollout 1) ---
+  // --- publishing ---
   visibility: Visibility;
   publishedAt: Timestamp | null;
   /** Never leaves the device. Excluded from the outbound sync set. */
   localOnly: boolean;
+  /** The readable half of the public URL, `/@handle/slug`. Null until published. */
+  slug: string | null;
+  /**
+   * True for a post written straight to the feed rather than a private note the
+   * author later shared.
+   *
+   * This is the *only* structural difference between the two, and it exists so
+   * the feed can label them honestly and the notes list can leave posts out of
+   * your private library. It is never a thing the note composer asks about --
+   * see docs/product.md.
+   */
+  bornPublic: boolean;
 
   // --- sync ---
   createdAt: Timestamp;
@@ -84,6 +96,8 @@ export interface NewNoteInput {
   parentId?: string | null;
   kind?: NoteKind;
   notebookId?: string | null;
+  /** Set only by the feed composer, which creates a note that is public from birth. */
+  bornPublic?: boolean;
 }
 
 /**

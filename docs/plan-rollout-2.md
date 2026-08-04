@@ -6,6 +6,32 @@ stopping being a notes app.
 
 ---
 
+## Status — 2026-08-04
+
+The in-app half of R2.0, R2.1 and R2.2 is built, plus direct posting, which this plan did not
+have. Two departures from what is written below, both deliberate:
+
+1. **Direct posting is in.** Section 1's "it is not a status feed" and section 7's "if you ever
+   add a 'what's happening?' box, you have lost" are superseded — see the amendment note in
+   [product.md](product.md). The guard that survived is structural: two composers on two tabs, and
+   the note composer has no social affordance on it.
+2. **It runs against local storage, not a server.** `apps/mobile/src/db/social-repo.ts` is the
+   seam; every social read and write in the app is one of its methods. Swapping to Supabase plus
+   the Hono worker described below means reimplementing that one file. Until then
+   `apps/mobile/src/lib/social-seed.ts` stands in for other users, and it is deleted — not
+   adapted — when the server exists.
+
+Built: profiles and handles with a reserved list · publish and unpublish a note · post straight to
+the feed · chronological following/everyone feed · follows · one reaction · view counts · block ·
+report. `supabase/migrations/20260804200000_social.sql` is the server schema and is not yet
+applied anywhere.
+
+Not built: the Hono web surface and public URLs that render without an install (the links the app
+shows are addresses the server will honour, not pages that exist yet) · comments · push
+notifications · themes · discovery · an admin queue for the reports table.
+
+---
+
 ## 0. The three questions you asked
 
 ### Platform: stay mobile, add a read-only web surface

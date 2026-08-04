@@ -10,7 +10,7 @@ import {
   type Block,
   type Note,
 } from '@dailynote/core';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -18,6 +18,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   Text,
   View,
 } from 'react-native';
@@ -34,6 +35,7 @@ import { useGoBack } from '@/lib/nav';
 import { useHistory } from '@/lib/undo';
 import { useNotebooks } from '@/store/notebooks-store';
 import { useNotes } from '@/store/notes-store';
+import { useSocial } from '@/store/social-store';
 import { useTheme } from '@/theme';
 
 /** How long the writing has to stop before an edit is written to SQLite. */
@@ -78,8 +80,10 @@ function Missing() {
 function Editor({ note }: { note: Note | null }) {
   const theme = useTheme();
   const goBack = useGoBack();
-  const { create, setContent, softDelete, promote, move, togglePin, setLocked } = useNotes();
+  const { create, setContent, softDelete, promote, move, togglePin, setLocked, repo } = useNotes();
   const { notebooks, find } = useNotebooks();
+  const { share: publish, unshare, shareError } = useSocial();
+  const router = useRouter();
 
   const history = useHistory<Block[]>(
     useMemo(() => parseDocument(note?.doc, note?.body ?? ''), [note?.doc, note?.body]),
@@ -232,6 +236,70 @@ function Editor({ note }: { note: Note | null }) {
     ]);
   }, [softDelete, goBack, blocks]);
 
+  const published = note?.visibility === 'public';
+
+  /**
+   * Publishing, the deliberate second act.
+   *
+   * It is a menu item on a note that already exists and it confirms first --
+   * the composer above never mentions an audience, and this is the only place
+   * in the notes half of the app that does. See docs/product.md rule 1.
+   */
+  const confirmShare = useCallback(() => {
+    setSheet(null);
+    void (async () => {
+      const id = await requireSaved();
+      if (id === null) return;
+
+      const current = await repo.get(id);
+      if (current === null) return;
+
+      const problem = shareError(current);
+      if (problem !== null) {
+        Alert.alert(
+          'Not this one',
+          problem === 'Claim a handle first.'
+            ? 'Pick a handle on the Feed tab before publishing anything.'
+            : problem,
+        );
+        return;
+      }
+
+      Alert.alert(
+        'Share this note?',
+        'It gets a public link that anyone can read. You can take it back at any time.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Share',
+            onPress: () => {
+              void (async () => {
+                const url = await publish(id);
+                if (url === null) return;
+                haptics.success();
+                void Share.share({ message: url, url });
+              })();
+            },
+          },
+        ],
+      );
+    })();
+  }, [requireSaved, repo, shareError, publish]);
+
+  const confirmUnshare = useCallback(() => {
+    setSheet(null);
+    Alert.alert('Remove from the feed?', 'The note stays here. The public copy goes.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => {
+          if (noteId.current !== null) void unshare(noteId.current);
+        },
+      },
+    ]);
+  }, [unshare]);
+
   return (
     <SafeAreaView className="flex-1 bg-paper dark:bg-paper-dark" edges={['top', 'left', 'right']}>
       <View className="flex-row items-center px-2 pb-1 pt-1">
@@ -340,6 +408,33 @@ function Editor({ note }: { note: Note | null }) {
               })();
             }}
           />
+          {published ? (
+            <>
+              <MenuRow
+                icon="globe"
+                label="View on the feed"
+                onPress={() => {
+                  setSheet(null);
+                  if (note !== null) {
+                    router.push({ pathname: '/post/[id]', params: { id: note.id } });
+                  }
+                }}
+              />
+              <MenuRow
+                icon="link"
+                label="Remove from the feed"
+                detail="The note stays here"
+                onPress={confirmUnshare}
+              />
+            </>
+          ) : (
+            <MenuRow
+              icon="share"
+              label="Share to the feed"
+              detail="Gives this note a public link"
+              onPress={confirmShare}
+            />
+          )}
           <MenuRow
             icon="lock"
             label="Lock this note"
