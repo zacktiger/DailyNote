@@ -1,10 +1,15 @@
 {
-  "paper": { "light": "#faf9f5", "dark": "#121110" },
-  "canvas": { "light": "#f1efe9", "dark": "#0d0c0b" },
-  "card": { "light": "#fffdf9", "dark": "#1c1a17" },
-  "ink": { "light": "#211f1c", "dark": "#ece9e2" },
-  "muted": { "light": "#6f6a60", "dark": "#98928a" },
-  "faint": { "light": "#aaa49a", "dark": "#5c574f" },
-  "line": { "light": "#e8e5dc", "dark": "#2a2723" },
-  "accent": { "light": "#31684d", "dark": "#a4c8b2" }
+  "canvas": { "light": "#f7f5f0", "dark": "#000000" },
+  "paper": { "light": "#ffffff", "dark": "#000000" },
+  "card": { "light": "#ffffff", "dark": "#1a1918" },
+  "elevated": { "light": "#ebe8e1", "dark": "#2b2a28" },
+  "sheet": { "light": "#ffffff", "dark": "#1c1b1a" },
+  "ink": { "light": "#16150f", "dark": "#f5f4f2" },
+  "muted": { "light": "#5f5a51", "dark": "#9a9791" },
+  "faint": { "light": "#8d887e", "dark": "#6a6763" },
+  "line": { "light": "#e2ded4", "dark": "#302f2c" },
+  "accent": { "light": "#b0740a", "dark": "#f0a92b" },
+  "accentInk": { "light": "#ffffff", "dark": "#141310" },
+  "swatch": { "light": "#e8b84b", "dark": "#f2d081" },
+  "swatchWarm": { "light": "#e09455", "dark": "#f0b27a" }
 }

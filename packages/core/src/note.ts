@@ -20,6 +20,10 @@ export function createNote(input: NewNoteInput, now: Date): Note {
     title: deriveTitle(input.body),
     doc: input.doc ?? null,
 
+    notebookId: input.notebookId ?? null,
+    locked: false,
+    pinnedAt: null,
+
     rootId: input.rootId ?? input.id,
     parentId: input.parentId ?? null,
     kind: input.kind ?? 'note',

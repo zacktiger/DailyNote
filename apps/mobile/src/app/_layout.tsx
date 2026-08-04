@@ -8,13 +8,15 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
+import * as SystemUI from 'expo-system-ui';
 import { colorScheme as nativewindColorScheme } from 'nativewind';
 import { Suspense, useEffect } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { migrate } from '@/db/migrations';
+import { NotebooksProvider } from '@/store/notebooks-store';
 import { NotesProvider } from '@/store/notes-store';
 import { useTheme } from '@/theme';
 
@@ -22,8 +24,8 @@ import '../global.css';
 
 export const DATABASE_NAME = 'dailynote.db';
 
-// Hold the splash until the serif is ready: the composer is the launch screen,
-// and it must not flash from system font to Newsreader mid-boot.
+// Hold the splash until the serif is ready: note titles are set in Newsreader
+// and must not flash from the system font to it mid-boot.
 void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -41,41 +43,47 @@ export default function RootLayout() {
   }, [ready]);
 
   useEffect(() => {
-    // Web only: with darkMode 'class' (see tailwind.config.js), dark: styles
-    // activate via a class on <html>; keep it mirroring the OS setting.
-    // Native must not take this path -- set() there overrides the app-level
-    // appearance instead of following the system.
-    if (Platform.OS === 'web') {
-      nativewindColorScheme.set(theme.dark ? 'dark' : 'light');
-    }
-  }, [theme.dark]);
+    // tailwind.config.js uses darkMode 'class', which means the `dark:`
+    // variants only activate for the scheme NativeWind has been told about.
+    // This must run on native too, not just web: without it every `dark:`
+    // class silently no-ops on device while useTheme() -- which reads
+    // useColorScheme() directly -- goes dark anyway, so dark navigator chrome
+    // ends up drawn behind light-styled content.
+    nativewindColorScheme.set(theme.dark ? 'dark' : 'light');
+    // Paints the window behind the React root, killing the white flash
+    // between the splash screen tearing down and the first frame.
+    void SystemUI.setBackgroundColorAsync(theme.canvas);
+  }, [theme]);
 
   if (!ready) return null;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.canvas }}>
       <SafeAreaProvider>
         <Suspense fallback={<Booting />}>
           <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrate} useSuspense>
-            <NotesProvider>
-              <StatusBar style={theme.dark ? 'light' : 'dark'} />
-              <Stack
-                screenOptions={{
-                  headerShadowVisible: false,
-                  headerStyle: { backgroundColor: theme.paper },
-                  headerTintColor: theme.ink,
-                  headerTitleStyle: { fontFamily: 'Newsreader_500Medium', fontSize: 19 },
-                  headerBackButtonDisplayMode: 'minimal',
-                  contentStyle: { backgroundColor: theme.paper },
-                }}
-              >
-                {/* The composer is the launch screen: the app opens with the
-                    cursor already in an empty note. */}
-                <Stack.Screen name="index" options={{ headerShown: false }} />
-                <Stack.Screen name="notes" options={{ title: 'Notes' }} />
-                <Stack.Screen name="note/[id]" options={{ title: '' }} />
-              </Stack>
-            </NotesProvider>
+            <NotebooksProvider>
+              <NotesProvider>
+                <StatusBar style={theme.dark ? 'light' : 'dark'} />
+                <Stack
+                  screenOptions={{
+                    // Every screen draws its own header: the reference chrome
+                    // is a plain icon row, not a navigator title bar.
+                    headerShown: false,
+                    contentStyle: { backgroundColor: theme.canvas },
+                  }}
+                >
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="note/[id]" />
+                  <Stack.Screen
+                    name="notebooks"
+                    options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                  />
+                  <Stack.Screen name="trash" />
+                  <Stack.Screen name="locked" />
+                </Stack>
+              </NotesProvider>
+            </NotebooksProvider>
           </SQLiteProvider>
         </Suspense>
       </SafeAreaProvider>
@@ -86,8 +94,8 @@ export default function RootLayout() {
 function Booting() {
   const theme = useTheme();
   return (
-    <View className="flex-1 items-center justify-center bg-paper dark:bg-paper-dark">
-      <ActivityIndicator color={theme.muted} />
+    <View className="flex-1 items-center justify-center bg-canvas dark:bg-canvas-dark">
+      <ActivityIndicator color={theme.accent} />
     </View>
   );
 }

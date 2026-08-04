@@ -60,6 +60,41 @@ const MIGRATIONS: readonly ((db: SQLiteDatabase) => Promise<void>)[] = [
   async (db) => {
     await db.execAsync('alter table notes add column doc text;');
   },
+
+  // v3 -- notebooks, locking and pinning.
+  //
+  // A note with a null notebook_id is in the Default notebook. Modelling the
+  // default as "no row" rather than a seeded row means there is no per-install
+  // id to reconcile when sync lands, and no way for a user to delete the
+  // bucket their notes fall back into.
+  async (db) => {
+    await db.execAsync(`
+      create table notebooks (
+        id          text primary key not null,
+        user_id     text,
+        name        text not null,
+        -- Palette key, not a hex value: notebooks re-theme with the app.
+        color       text not null default 'swatch',
+        sort_order  integer not null default 0,
+
+        created_at  text not null,
+        updated_at  text not null,
+        deleted     integer not null default 0
+      );
+
+      alter table notes add column notebook_id text
+        references notebooks(id) on delete set null;
+
+      -- Notes hidden behind the device lock. See lib/lock.ts.
+      alter table notes add column locked integer not null default 0;
+
+      -- Manual pin to the top of the list, independent of updated_at.
+      alter table notes add column pinned_at text;
+
+      create index notes_notebook_idx on notes (notebook_id);
+      create index notebooks_sort_idx on notebooks (sort_order);
+    `);
+  },
 ];
 
 /**

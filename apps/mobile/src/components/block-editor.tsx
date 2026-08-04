@@ -268,9 +268,7 @@ export function BlockEditor({
               // A fixed gutter rather than a character in the text: the marker
               // is structure, so it cannot be typed over, and a line that wraps
               // hangs under the first word instead of under the dot.
-              <Text className="w-5 font-serif text-[21px] leading-8 text-muted dark:text-muted-dark">
-                •
-              </Text>
+              <Text className="w-5 text-[17px] leading-7 text-muted dark:text-muted-dark">•</Text>
             ) : null}
 
             <TextInput
@@ -306,10 +304,11 @@ export function BlockEditor({
               placeholder={isTitle ? placeholder : undefined}
               placeholderTextColor={theme.faint}
               selectionColor={theme.accent}
+              cursorColor={theme.accent}
               className={
                 isTitle
-                  ? 'flex-1 py-0 font-serif-medium text-[28px] leading-9 text-ink web:outline-none dark:text-ink-dark'
-                  : 'flex-1 py-0 font-serif text-[21px] leading-8 text-ink web:outline-none dark:text-ink-dark'
+                  ? 'flex-1 py-0 text-[30px] font-bold leading-9 text-ink web:outline-none dark:text-ink-dark'
+                  : 'flex-1 py-0 text-[17px] leading-7 text-ink web:outline-none dark:text-ink-dark'
               }
             />
           </Animated.View>
@@ -352,12 +351,10 @@ function ImageRow({ block, onRemove }: { block: ImageBlock; onRemove: () => void
           // No file system here. The note still reads; the photo is on the
           // device that took it.
           <Animated.View
-            className="items-center justify-center rounded-2xl bg-line/60 dark:bg-line-dark/60"
+            className="items-center justify-center rounded-2xl bg-elevated dark:bg-elevated-dark"
             style={{ width, height }}
           >
-            <Text className="font-serif-italic text-sm text-muted dark:text-muted-dark">
-              Photo
-            </Text>
+            <Text className="text-[13px] text-muted dark:text-muted-dark">Photo</Text>
           </Animated.View>
         ) : (
           <Image

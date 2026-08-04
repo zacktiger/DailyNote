@@ -29,6 +29,14 @@ export interface Note {
    */
   doc: string | null;
 
+  // --- filing ---
+  /** Null means the Default notebook, which is the absence of a notebook. */
+  notebookId: string | null;
+  /** Hidden from the list until the device lock is satisfied. */
+  locked: boolean;
+  /** Non-null sorts the note above unpinned ones, newest pin first. */
+  pinnedAt: Timestamp | null;
+
   // --- threading / follow-through ---
   /** Equals `id` for a root note. A thread is a root plus its updates. */
   rootId: string;
@@ -75,4 +83,34 @@ export interface NewNoteInput {
   rootId?: string;
   parentId?: string | null;
   kind?: NoteKind;
+  notebookId?: string | null;
 }
+
+/**
+ * A user-created folder for notes.
+ *
+ * There is deliberately no row for the Default notebook: a note with a null
+ * `notebookId` is in it. That keeps the fallback bucket undeletable and avoids
+ * a per-install id to reconcile when sync lands.
+ */
+export interface Notebook {
+  id: string;
+  userId: string | null;
+  name: string;
+  /** A palette key (see the mobile theme), never a hex value. */
+  color: string;
+  sortOrder: number;
+
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  deleted: boolean;
+}
+
+/** The sentinel the UI uses for "everything", distinct from a real id. */
+export const ALL_NOTES = '__all__';
+
+/** The sentinel for the null-notebookId bucket. */
+export const DEFAULT_NOTEBOOK = '__default__';
+
+/** What the notes list is currently filtered to. */
+export type NotebookFilter = string;
