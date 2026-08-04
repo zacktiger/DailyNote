@@ -207,6 +207,40 @@ export function setAlign(blocks: readonly Block[], index: number, align: Align):
   return next;
 }
 
+/**
+ * Puts an image into the document, just after `index`.
+ *
+ * Always leaves a text block after it. An image cannot hold a caret, so a
+ * document ending in one would strand the user with nowhere left to type.
+ */
+export function insertImage(
+  blocks: readonly Block[],
+  index: number | null,
+  block: ImageBlock,
+): Block[] {
+  const at = index === null ? blocks.length - 1 : index;
+  const next = [...blocks];
+  next.splice(at + 1, 0, block);
+
+  const after = next[at + 2];
+  if (after === undefined || !isTextBlock(after)) {
+    next.splice(at + 2, 0, paragraph('', block.align));
+  }
+
+  return next;
+}
+
+/** Removes one block. Used for taking an image back out. */
+export function removeBlock(blocks: readonly Block[], index: number): Block[] {
+  if (blocks[index] === undefined) return [...blocks];
+
+  const next = [...blocks];
+  next.splice(index, 1);
+
+  // Never leave an empty document; the editor needs a block to focus.
+  return next.length === 0 ? [paragraph()] : next;
+}
+
 /** True when there is nothing worth saving: no image, and no non-blank text. */
 export function isEmptyDocument(blocks: readonly Block[]): boolean {
   return blocks.every((block) => isTextBlock(block) && block.text.trim().length === 0);

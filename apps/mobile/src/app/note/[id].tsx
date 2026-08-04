@@ -1,4 +1,5 @@
 import {
+  insertImage,
   parseDocument,
   setAlign,
   threadOf,
@@ -20,6 +21,7 @@ import Animated from 'react-native-reanimated';
 
 import { BlockEditor, type BlockEditorHandle } from '@/components/block-editor';
 import { BlockToolbar } from '@/components/block-toolbar';
+import { pickImage } from '@/lib/attachments';
 import { comesBack, formatDay } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import * as motion from '@/lib/motion';
@@ -215,6 +217,13 @@ function NoteEditor({ note }: { note: Note }) {
           if (focused === null) return;
           change(setAlign(blocks, focused, align));
           editor.current?.restoreFocus();
+        }}
+        onAddImage={async () => {
+          const picked = await pickImage();
+          if (picked === null) return;
+          // `latest` rather than `blocks`: the picker is a round trip through
+          // another screen, and this closure is from before it opened.
+          change(insertImage(latest.current, focused, picked));
         }}
       />
     </KeyboardAvoidingView>

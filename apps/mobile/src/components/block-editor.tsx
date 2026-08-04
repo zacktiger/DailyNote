@@ -1,16 +1,29 @@
-import { bullet, isTextBlock, paragraph, type Block, type TextBlock } from '@dailynote/core';
+import {
+  bullet,
+  isTextBlock,
+  paragraph,
+  removeBlock,
+  type Align,
+  type Block,
+  type ImageBlock,
+  type TextBlock,
+} from '@dailynote/core';
+import { Image } from 'expo-image';
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import {
   Platform,
   Pressable,
   Text,
   TextInput,
+  useWindowDimensions,
   type NativeSyntheticEvent,
   type TextInputKeyPressEventData,
   type TextInputSelectionChangeEventData,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
+import { attachmentUri } from '@/lib/attachments';
+import { haptics } from '@/lib/haptics';
 import * as motion from '@/lib/motion';
 import { useTheme } from '@/theme';
 
@@ -37,6 +50,19 @@ import { useTheme } from '@/theme';
 
 /** How long a blur waits before it counts, so moving block to block is quiet. */
 const BLUR_GRACE_MS = 80;
+
+/** The writing surface's horizontal padding, doubled. Images fit inside it. */
+const GUTTERS = 40;
+
+/** Tall enough to read, short enough that a portrait photo is not a scroll. */
+const MAX_IMAGE_HEIGHT = 420;
+
+/** Where a block sits in its row when it is narrower than the line. */
+const ROW_ITEMS: Record<Align, 'flex-start' | 'center' | 'flex-end'> = {
+  left: 'flex-start',
+  center: 'center',
+  right: 'flex-end',
+};
 
 export interface BlockEditorProps {
   blocks: Block[];
@@ -219,7 +245,18 @@ export function BlockEditor({
   return (
     <>
       {blocks.map((block, index) => {
-        if (!isTextBlock(block)) return null;
+        if (block.type === 'image') {
+          return (
+            <ImageRow
+              key={block.id}
+              block={block}
+              onRemove={() => {
+                haptics.tap();
+                onChange(removeBlock(blocks, index));
+              }}
+            />
+          );
+        }
 
         // Only a plain first line is the title. Bullet the top line and it
         // becomes an ordinary list item, which is what it now is.
@@ -283,6 +320,55 @@ export function BlockEditor({
           caret at the end, the way tapping empty paper would. */}
       <Pressable className="min-h-[140px] flex-1" onPress={focusLast} />
     </>
+  );
+}
+
+/**
+ * An image in the note, sized from what was measured when it was picked.
+ *
+ * Knowing the intrinsic size up front means the space is reserved before the
+ * file loads, so a note does not jump around as its photos appear.
+ */
+function ImageRow({ block, onRemove }: { block: ImageBlock; onRemove: () => void }) {
+  const { width: screen } = useWindowDimensions();
+
+  const available = screen - GUTTERS;
+  const ratio = block.width > 0 && block.height > 0 ? block.height / block.width : 3 / 4;
+  const height = Math.min(available * ratio, MAX_IMAGE_HEIGHT);
+  const width = height / ratio;
+
+  const uri = attachmentUri(block.uri);
+
+  return (
+    <Animated.View
+      layout={motion.layout}
+      className="px-5 py-1.5"
+      style={{ alignItems: ROW_ITEMS[block.align] }}
+    >
+      {/* Long press rather than a delete affordance on every photo: the note is
+          the thing being read, and a button per image would clutter it. */}
+      <Pressable onLongPress={onRemove} delayLongPress={400}>
+        {uri === null ? (
+          // No file system here. The note still reads; the photo is on the
+          // device that took it.
+          <Animated.View
+            className="items-center justify-center rounded-2xl bg-line/60 dark:bg-line-dark/60"
+            style={{ width, height }}
+          >
+            <Text className="font-serif-italic text-sm text-muted dark:text-muted-dark">
+              Photo
+            </Text>
+          </Animated.View>
+        ) : (
+          <Image
+            source={{ uri }}
+            style={{ width, height, borderRadius: 16 }}
+            contentFit="cover"
+            transition={motion.ENTER_MS}
+          />
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 

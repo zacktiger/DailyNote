@@ -1,6 +1,7 @@
 import {
   documentToText,
   hasCommitmentTag,
+  insertImage,
   isEmptyDocument,
   paragraph,
   parseHashtags,
@@ -30,6 +31,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BlockEditor, type BlockEditorHandle } from '@/components/block-editor';
 import { BlockToolbar } from '@/components/block-toolbar';
+import { pickImage } from '@/lib/attachments';
 import { todayHeading } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import * as motion from '@/lib/motion';
@@ -230,6 +232,13 @@ export default function Composer() {
               if (focused === null) return;
               setBlocks(setAlign(blocks, focused, align));
               editor.current?.restoreFocus();
+            }}
+            onAddImage={async () => {
+              const picked = await pickImage();
+              if (picked === null) return;
+              // Functional update: the picker is a round trip through another
+              // screen, and `blocks` here is from before it opened.
+              setBlocks((current) => insertImage(current, focused, picked));
             }}
           />
         </Animated.View>

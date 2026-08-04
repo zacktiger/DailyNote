@@ -3,9 +3,11 @@ import {
   bullet,
   documentToText,
   image,
+  insertImage,
   isEmptyDocument,
   paragraph,
   parseDocument,
+  removeBlock,
   serializeDocument,
   setAlign,
   toggleBullet,
@@ -178,6 +180,77 @@ describe('setAlign', () => {
     setAlign(blocks, 0, 'right');
 
     expect(blocks[0]!.align).toBe('left');
+  });
+});
+
+describe('insertImage', () => {
+  const photo = () => image('attachments/a.jpg', 800, 600);
+
+  it('puts the image after the block that had the caret', () => {
+    const blocks = [paragraph('Beach day'), paragraph('the tide was out')];
+
+    expect(insertImage(blocks, 0, photo()).map((block) => block.type)).toEqual([
+      'paragraph',
+      'image',
+      'paragraph',
+    ]);
+  });
+
+  it('leaves somewhere to type when the image lands at the end', () => {
+    const blocks = [paragraph('Beach day')];
+    const next = insertImage(blocks, 0, photo());
+
+    expect(next.map((block) => block.type)).toEqual(['paragraph', 'image', 'paragraph']);
+    expect(next[2]).toMatchObject({ text: '' });
+  });
+
+  it('does not add a second empty line when one already follows', () => {
+    const blocks = [paragraph('Beach day'), paragraph('')];
+
+    expect(insertImage(blocks, 0, photo())).toHaveLength(3);
+  });
+
+  it('appends at the end when nothing has the caret', () => {
+    const blocks = [paragraph('Beach day')];
+
+    expect(insertImage(blocks, null, photo())[1]!.type).toBe('image');
+  });
+
+  it('keeps the image out of the text projection', () => {
+    const blocks = insertImage([paragraph('Beach day')], 0, photo());
+
+    expect(documentToText(blocks)).toBe('Beach day\n');
+  });
+
+  it('survives the round trip through storage', () => {
+    const blocks = insertImage([paragraph('Beach day')], 0, photo());
+    const restored = parseDocument(serializeDocument(blocks), '');
+
+    expect(restored[1]).toMatchObject({
+      type: 'image',
+      uri: 'attachments/a.jpg',
+      width: 800,
+      height: 600,
+    });
+  });
+});
+
+describe('removeBlock', () => {
+  it('takes the block out', () => {
+    const blocks = [paragraph('a'), image('attachments/a.jpg', 10, 10), paragraph('b')];
+
+    expect(removeBlock(blocks, 1).map((block) => block.type)).toEqual(['paragraph', 'paragraph']);
+  });
+
+  it('never empties the document', () => {
+    const next = removeBlock([image('attachments/a.jpg', 10, 10)], 0);
+
+    expect(next).toHaveLength(1);
+    expect(next[0]!.type).toBe('paragraph');
+  });
+
+  it('is a no-op for an index that is not there', () => {
+    expect(removeBlock([paragraph('a')], 9)).toHaveLength(1);
   });
 });
 

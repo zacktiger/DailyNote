@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
+import { canAttachImages } from '@/lib/attachments';
 import { haptics } from '@/lib/haptics';
 import * as motion from '@/lib/motion';
 
@@ -28,9 +29,10 @@ export interface BlockToolbarProps {
   block: Block | undefined;
   onToggleBullet: () => void;
   onAlign: (align: Align) => void;
+  onAddImage: () => void;
 }
 
-export function BlockToolbar({ block, onToggleBullet, onAlign }: BlockToolbarProps) {
+export function BlockToolbar({ block, onToggleBullet, onAlign, onAddImage }: BlockToolbarProps) {
   // Nothing to format when the caret is nowhere at all.
   if (block === undefined) return null;
 
@@ -59,7 +61,23 @@ export function BlockToolbar({ block, onToggleBullet, onAlign }: BlockToolbarPro
           <AlignIcon align={align} active={block.align === align} />
         </ToolbarButton>
       ))}
+
+      {canAttachImages ? (
+        <ToolbarButton active={false} onPress={onAddImage}>
+          <PhotoIcon />
+        </ToolbarButton>
+      ) : null}
     </Animated.View>
+  );
+}
+
+/** A frame with a horizon and a sun in it -- a picture, at 16 pixels. */
+function PhotoIcon() {
+  return (
+    <View className="h-4 w-4 justify-end overflow-hidden rounded-[3px] border border-muted dark:border-muted-dark">
+      <View className="absolute right-[2px] top-[2px] h-[3px] w-[3px] rounded-full bg-muted dark:bg-muted-dark" />
+      <View className="h-[5px] w-full rounded-t-[4px] bg-muted dark:bg-muted-dark" />
+    </View>
   );
 }
 
