@@ -9,6 +9,7 @@ import { Icon, type IconName } from '@/components/icon';
 import { Sheet } from '@/components/sheet';
 import { haptics } from '@/lib/haptics';
 import { useGoBack } from '@/lib/nav';
+import { useAuth } from '@/store/auth-store';
 import { useSocial } from '@/store/social-store';
 import { useTheme } from '@/theme';
 
@@ -27,6 +28,7 @@ export default function ProfileScreen() {
   const goBack = useGoBack();
   const { me, items, following, blocked, repo, setFollowing, setBlocked, setLiked, updateMe } =
     useSocial();
+  const { signOut } = useAuth();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [counts, setCounts] = useState({ followers: 0, following: 0 });
@@ -171,7 +173,28 @@ export default function ProfileScreen() {
       <Sheet visible={sheet === 'more'} onClose={() => setSheet(null)} title="Profile">
         <View className="pb-2">
           {mine ? (
-            <MenuRow icon="edit" label="Edit profile" onPress={() => setSheet('edit')} />
+            <>
+              <MenuRow icon="edit" label="Edit profile" onPress={() => setSheet('edit')} />
+              <MenuRow
+                icon="block"
+                label="Sign out"
+                destructive
+                onPress={() => {
+                  setSheet(null);
+                  Alert.alert('Sign out?', 'Your notes stay on this device either way.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Sign out',
+                      style: 'destructive',
+                      onPress: () => {
+                        void signOut();
+                        goBack();
+                      },
+                    },
+                  ]);
+                }}
+              />
+            </>
           ) : (
             <MenuRow
               icon="block"

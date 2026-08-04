@@ -1,5 +1,5 @@
 import { composeFeed, type FeedItem } from '@dailynote/core';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -28,9 +28,19 @@ import { useTheme } from '@/theme';
 export default function Feed() {
   const theme = useTheme();
   const router = useRouter();
-  const { me, items, following, blocked, loading, setLiked } = useSocial();
+  const { me, needed, items, following, blocked, loading, setLiked } = useSocial();
 
   const [scope, setScope] = useState<'following' | 'everyone'>('everyone');
+
+  /**
+   * The screen standing between the reader and publishing, or null.
+   *
+   * Sign-in and the handle claim are two steps, and this names whichever is
+   * outstanding so nobody is sent to one they have already satisfied. Reading
+   * never consults it.
+   */
+  const gate: Href | null =
+    needed === 'sign-in' ? '/sign-in' : needed === 'handle' ? '/handle' : null;
 
   const feed = useMemo(
     () =>
@@ -62,9 +72,9 @@ export default function Feed() {
           accessibilityRole="button"
           accessibilityLabel={me === null ? 'Set up your profile' : 'Your profile'}
           onPress={() =>
-            me === null
-              ? router.push('/handle')
-              : router.push({ pathname: '/profile/[handle]', params: { handle: me.handle } })
+            router.push(
+              gate ?? { pathname: '/profile/[handle]', params: { handle: me?.handle ?? '' } },
+            )
           }
           className="h-11 w-11 items-center justify-center rounded-full active:opacity-50"
         >
@@ -82,12 +92,7 @@ export default function Feed() {
         contentContainerClassName="pb-32"
         itemLayoutAnimation={motion.layout}
         ListHeaderComponent={
-          <Header
-            scope={scope}
-            onScope={setScope}
-            count={feed.length}
-            claimed={me !== null}
-          />
+          <Header scope={scope} onScope={setScope} count={feed.length} needed={needed} />
         }
         ListEmptyComponent={loading ? null : <Empty scope={scope} />}
         renderItem={({ item, index }) => (
@@ -105,7 +110,7 @@ export default function Feed() {
         accessibilityLabel="Write a post"
         onPress={() => {
           haptics.tap();
-          router.push(me === null ? '/handle' : '/post/new');
+          router.push(gate ?? '/post/new');
         }}
         onPressIn={() => {
           fabPressed.value = withSpring(1, motion.SPRING);
@@ -126,12 +131,12 @@ function Header({
   scope,
   onScope,
   count,
-  claimed,
+  needed,
 }: {
   scope: 'following' | 'everyone';
   onScope: (next: 'following' | 'everyone') => void;
   count: number;
-  claimed: boolean;
+  needed: 'sign-in' | 'handle' | null;
 }) {
   const router = useRouter();
   const theme = useTheme();
@@ -145,21 +150,23 @@ function Header({
         {count === 1 ? '1 thread' : `${count} threads`}
       </Text>
 
-      {!claimed ? (
-        // Shown until a handle exists rather than blocking the screen: reading
-        // the feed needs no account, and being asked to sign up before you can
-        // see anything is how a social tab teaches people to avoid it.
+      {needed !== null ? (
+        // A prompt, not a wall. Reading the feed needs no account at all, and
+        // demanding a sign-up before you can see anything is how a social tab
+        // teaches people to avoid it.
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push('/handle')}
+          onPress={() => router.push(needed === 'sign-in' ? '/sign-in' : '/handle')}
           className="mx-4 mt-4 flex-row items-center gap-3 rounded-2xl bg-card px-4 py-3.5 active:opacity-70 dark:bg-card-dark"
         >
           <View className="flex-1">
             <Text className="text-[15px] font-semibold text-ink dark:text-ink-dark">
-              Pick a handle to post
+              {needed === 'sign-in' ? 'Sign in to publish' : 'Pick a handle to post'}
             </Text>
             <Text className="pt-0.5 text-[13px] text-muted dark:text-muted-dark">
-              Reading needs nothing. Publishing needs a name.
+              {needed === 'sign-in'
+                ? 'Reading needs nothing. Your notes need nothing either.'
+                : 'One more step, and it is the only one that shows.'}
             </Text>
           </View>
           <Icon name="chevron" size={20} color={theme.faint} />

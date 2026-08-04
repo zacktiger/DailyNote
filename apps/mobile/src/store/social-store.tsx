@@ -22,6 +22,7 @@ import {
 
 import { createSocialRepo, type ProfilePatch, type SocialRepo } from '@/db/social-repo';
 import { seedSocial } from '@/lib/social-seed';
+import { useAuth } from '@/store/auth-store';
 import { useNotes } from '@/store/notes-store';
 
 /**
@@ -38,8 +39,13 @@ import { useNotes } from '@/store/notes-store';
  */
 
 interface SocialContextValue {
-  /** Null until a handle is claimed. Everything that writes requires it. */
+  /** Null until signed in *and* a handle is claimed. Everything that writes requires it. */
   me: Profile | null;
+  /**
+   * What the reader still has to do before they can publish, or null if
+   * nothing. Reading the feed is never gated -- this only ever guards writes.
+   */
+  needed: 'sign-in' | 'handle' | null;
   loading: boolean;
   /** Every mirrored item. `composeFeed` turns this into what a reader sees. */
   items: FeedItem[];
@@ -73,8 +79,14 @@ const SocialContext = createContext<SocialContextValue | null>(null);
 
 export function SocialProvider({ children }: { children: ReactNode }) {
   const db = useSQLiteContext();
-  const repo = useMemo(() => createSocialRepo(db), [db]);
+  const { userId, ready: authReady } = useAuth();
   const { notes, repo: notesRepo, refresh: refreshNotes } = useNotes();
+
+  // Rebuilt when the session changes, which is what makes signing in or out
+  // reload the screens: `me`, `following` and "liked by me" all resolve
+  // through the account id this closure captures. The load effect downstream
+  // re-runs with it, and re-seeding is a no-op after the first time.
+  const repo = useMemo(() => createSocialRepo(db, () => userId), [db, userId]);
 
   const [me, setMe] = useState<Profile | null>(null);
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -156,6 +168,10 @@ export function SocialProvider({ children }: { children: ReactNode }) {
 
     return {
       me,
+      // Reading needs nothing; publishing needs an account and then a handle.
+      // Held apart because they are two different screens and the second one
+      // is where the product's one identity decision gets made.
+      needed: !authReady ? null : userId === null ? 'sign-in' : me === null ? 'handle' : null,
       loading,
       items,
       following,
@@ -170,7 +186,9 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         if (await repo.handleTaken(normalized)) return 'Somebody has that one.';
 
         const trimmed = displayName.trim();
-        await repo.claim(normalized, trimmed.length > 0 ? trimmed : null);
+        const claimed = await repo.claim(normalized, trimmed.length > 0 ? trimmed : null);
+        if (claimed === null) return 'Sign in first.';
+
         await refresh();
         return null;
       },
@@ -181,6 +199,7 @@ export function SocialProvider({ children }: { children: ReactNode }) {
       },
 
       shareError(note) {
+        if (userId === null) return 'Sign in to publish.';
         if (me === null) return 'Claim a handle first.';
         return publishError(note);
       },
@@ -238,7 +257,20 @@ export function SocialProvider({ children }: { children: ReactNode }) {
         await repo.recordView(itemId);
       },
     };
-  }, [me, loading, items, following, blocked, repo, refresh, notes, notesRepo, refreshNotes]);
+  }, [
+    me,
+    userId,
+    authReady,
+    loading,
+    items,
+    following,
+    blocked,
+    repo,
+    refresh,
+    notes,
+    notesRepo,
+    refreshNotes,
+  ]);
 
   return <SocialContext.Provider value={value}>{children}</SocialContext.Provider>;
 }

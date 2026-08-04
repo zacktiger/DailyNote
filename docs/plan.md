@@ -302,7 +302,9 @@ This is the differentiator. Do not compress it.
 ### Phase 4 — Accounts and sync · ~2 weeks
 Deliberately after the app is good. Sync will eat weeks and it is not the product.
 
-- Supabase Auth, email + magic link
+- ~~Supabase Auth, email + magic link~~ — **done, and it is three providers, not one**: Google,
+  a six-digit email code (not a magic link — the mail-to-browser-to-app handoff loses people), and
+  Sign in with Apple. See [auth.md](auth.md). Sync is the part of this phase still outstanding
 - **Start anonymous.** Users write before signing up; account creation claims existing local
   notes. Supabase anonymous sign-in handles this. Forcing signup before the first note is the
   most common way apps like this die
@@ -356,7 +358,7 @@ state of all of these.
 | 3 | License | MIT app + core, AGPL-3.0 DB + server — [ADR 0004](adr/0004-licensing.md) | ✅ |
 | 5 | Name + bundle ID | **DailyNote**, `com.zacktiger.dailynote`, scheme `dailynote://` | ✅ |
 | — | Notes-app integration | Dropped, no API exists — [ADR 0003](adr/0003-no-notes-app-integrations.md) | ✅ |
-| 4 | Sign in with Apple | **Not required** if magic-link is the only auth. Apple mandates it only when you offer third-party social login. Skipping it is correct for Rollout 1 | Phase 4 |
+| 4 | Sign in with Apple | ~~Not required if magic-link is the only auth~~ → **Required.** Google Sign-In shipped, and guideline 4.8's alternative must let users keep their email private, which an emailed code cannot. All three are wired; Apple is iOS-only — [auth.md](auth.md) | ✅ |
 | 6 | Web | Marketing page only in Rollout 1 — no Expo Web. Rollout 2 adds a separate server-rendered read surface, which is not this | Phase 6 |
 
 ---

@@ -16,6 +16,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { migrate } from '@/db/migrations';
+import { AuthProvider } from '@/store/auth-store';
 import { NotebooksProvider } from '@/store/notebooks-store';
 import { NotesProvider } from '@/store/notes-store';
 import { SocialProvider } from '@/store/social-store';
@@ -67,37 +68,57 @@ export default function RootLayout() {
               <NotesProvider>
                 {/* Inside NotesProvider, not beside it: publishing is an
                     operation on a note, so the social store reads the notes
-                    store rather than keeping a second copy of the same rows. */}
-                <SocialProvider>
-                  <StatusBar style={theme.dark ? 'light' : 'dark'} />
-                  <Stack
-                    screenOptions={{
-                      // Every screen draws its own header: the reference chrome
-                      // is a plain icon row, not a navigator title bar.
-                      headerShown: false,
-                      contentStyle: { backgroundColor: theme.canvas },
-                    }}
-                  >
-                    <Stack.Screen name="(tabs)" />
-                    <Stack.Screen name="note/[id]" />
-                    <Stack.Screen
-                      name="notebooks"
-                      options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-                    />
-                    <Stack.Screen name="trash" />
-                    <Stack.Screen name="locked" />
-                    <Stack.Screen name="post/[id]" />
-                    <Stack.Screen
-                      name="post/new"
-                      options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-                    />
-                    <Stack.Screen name="profile/[handle]" />
-                    <Stack.Screen
-                      name="handle"
-                      options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-                    />
-                  </Stack>
-                </SocialProvider>
+                    store rather than keeping a second copy of the same rows.
+                    Auth wraps social because a profile is keyed to an account,
+                    and nothing in the notes half reads either of them. */}
+                <AuthProvider>
+                  <SocialProvider>
+                    <StatusBar style={theme.dark ? 'light' : 'dark'} />
+                    <Stack
+                      screenOptions={{
+                        // Every screen draws its own header: the reference chrome
+                        // is a plain icon row, not a navigator title bar.
+                        headerShown: false,
+                        contentStyle: { backgroundColor: theme.canvas },
+                      }}
+                    >
+                      <Stack.Screen name="(tabs)" />
+                      <Stack.Screen name="note/[id]" />
+                      <Stack.Screen
+                        name="notebooks"
+                        options={{
+                          presentation: 'modal',
+                          animation: 'slide_from_bottom',
+                        }}
+                      />
+                      <Stack.Screen name="trash" />
+                      <Stack.Screen name="locked" />
+                      <Stack.Screen name="post/[id]" />
+                      <Stack.Screen
+                        name="post/new"
+                        options={{
+                          presentation: 'modal',
+                          animation: 'slide_from_bottom',
+                        }}
+                      />
+                      <Stack.Screen name="profile/[handle]" />
+                      <Stack.Screen
+                        name="handle"
+                        options={{
+                          presentation: 'modal',
+                          animation: 'slide_from_bottom',
+                        }}
+                      />
+                      <Stack.Screen
+                        name="sign-in"
+                        options={{
+                          presentation: 'modal',
+                          animation: 'slide_from_bottom',
+                        }}
+                      />
+                    </Stack>
+                  </SocialProvider>
+                </AuthProvider>
               </NotesProvider>
             </NotebooksProvider>
           </SQLiteProvider>
