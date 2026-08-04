@@ -36,6 +36,8 @@ interface NotesContextValue {
   move: (id: string, notebookId: string | null) => Promise<void>;
   togglePin: (id: string) => Promise<void>;
   setLocked: (id: string, locked: boolean) => Promise<void>;
+  /** Ticks a to-do off, or puts an already-done one back on the list. */
+  setCompleted: (id: string, completed: boolean) => Promise<void>;
   promote: (id: string) => Promise<void>;
   review: (id: string, answer: ReviewAnswer, updateBody?: string) => Promise<void>;
 }
@@ -122,6 +124,19 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
       async setLocked(id, locked) {
         await repo.update(id, { locked });
+        await refresh();
+      },
+
+      async setCompleted(id, completed) {
+        const note = await repo.get(id);
+        if (note === null) return;
+        // Un-completing puts the note back in the "due now" bucket rather than
+        // restoring whatever future date it had: if you are reopening it, it
+        // is because it needs attention now.
+        await repo.update(id, {
+          completedAt: completed ? new Date().toISOString() : null,
+          nextReviewAt: completed ? note.nextReviewAt : new Date().toISOString(),
+        });
         await refresh();
       },
 

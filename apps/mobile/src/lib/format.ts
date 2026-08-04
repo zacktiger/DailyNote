@@ -38,3 +38,24 @@ export function comesBack(iso: string, now: Date = new Date()): string {
 export function todayHeading(now: Date = new Date()): string {
   return now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 }
+
+/**
+ * The list row's numeric date: "31/07/2026".
+ *
+ * Fixed to day/month/year rather than the locale's order, because it sits
+ * inline in front of the preview text where a variable-width date would make
+ * the previews fail to line up down the list.
+ */
+export function shortDate(iso: string): string {
+  const date = new Date(iso);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+}
+
+/** The editor's meta line: "04/08/2026, 5:08 pm". */
+export function editedAt(iso: string): string {
+  const time = new Date(iso)
+    .toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    .toLowerCase();
+  return `${shortDate(iso)}, ${time}`;
+}

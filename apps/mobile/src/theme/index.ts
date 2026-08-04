@@ -32,3 +32,15 @@ export function useTheme(): Theme {
   const dark = useColorScheme() === 'dark';
   return useMemo(() => (dark ? THEMES.dark : THEMES.light), [dark]);
 }
+
+/**
+ * Resolves a stored palette key, such as a notebook's colour.
+ *
+ * Notebooks store a key rather than a hex value so they re-theme with the app,
+ * but the key comes out of the database and may name a colour that a later
+ * release removed -- hence the fallback rather than an index straight into the
+ * theme.
+ */
+export function swatchColor(theme: Theme, key: string): string {
+  return key in palette ? theme[key as PaletteKey] : theme.swatch;
+}
