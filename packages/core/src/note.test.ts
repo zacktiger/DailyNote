@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createNote, editBody, isSyncable, threadOf } from './note';
+import { bullet, documentToText, paragraph, parseDocument, serializeDocument } from './document';
+import { createNote, editBody, editContent, isSyncable, threadOf } from './note';
 import { makeNote } from './test-support';
 
 const NOW = new Date('2026-07-26T09:00:00.000Z');
@@ -61,6 +62,58 @@ describe('editBody', () => {
     expect(edited.title).toBe('New title');
     expect(edited.updatedAt).toBe(NOW.toISOString());
     expect(edited.createdAt).toBe(note.createdAt);
+  });
+
+  it('clears the document, so a stale one cannot outlive the text', () => {
+    const note = makeNote({ doc: serializeDocument([paragraph('Old title')]) });
+
+    expect(editBody(note, 'New title', NOW).doc).toBeNull();
+  });
+});
+
+describe('editContent', () => {
+  it('writes the document and its projection together', () => {
+    const note = makeNote({ body: 'Old' });
+    const edited = editContent(note, [paragraph('Groceries'), bullet('milk')], NOW);
+
+    expect(edited.body).toBe('Groceries\n- milk');
+    expect(edited.title).toBe('Groceries');
+    expect(edited.updatedAt).toBe(NOW.toISOString());
+    expect(parseDocument(edited.doc, edited.body).map((block) => block.type)).toEqual([
+      'paragraph',
+      'bullet',
+    ]);
+  });
+
+  it('keeps body and doc describing the same note', () => {
+    const edited = editContent(makeNote(), [paragraph('one'), paragraph('two')], NOW);
+
+    expect(documentToText(parseDocument(edited.doc, ''))).toBe(edited.body);
+  });
+});
+
+describe('a note written before rich text existed', () => {
+  it('has no document', () => {
+    expect(createNote({ id: 'abc', body: 'Hello' }, NOW).doc).toBeNull();
+  });
+
+  it('opens as a document of paragraphs, one per line', () => {
+    // The upgrade path: every note already on a device arrives here with a
+    // null `doc`, and must still be readable and editable.
+    const note = createNote({ id: 'abc', body: 'Groceries\nmilk\noats' }, NOW);
+    const blocks = parseDocument(note.doc, note.body);
+
+    expect(blocks).toHaveLength(3);
+    expect(documentToText(blocks)).toBe(note.body);
+  });
+
+  it('gains a document as soon as it is edited, without changing its text', () => {
+    const note = createNote({ id: 'abc', body: 'Groceries\nmilk' }, NOW);
+    const edited = editContent(note, parseDocument(note.doc, note.body), NOW);
+
+    expect(edited.doc).not.toBeNull();
+    expect(edited.body).toBe(note.body);
+    expect(edited.title).toBe(note.title);
   });
 });
 
