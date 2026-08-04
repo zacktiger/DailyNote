@@ -1,4 +1,3 @@
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Platform } from 'react-native';
 
@@ -62,17 +61,31 @@ export const canUseApple = Platform.OS === 'ios' && isAuthConfigured;
 
 let googleConfigured = false;
 
-function configureGoogle(): void {
-  if (googleConfigured) return;
-  GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
-  googleConfigured = true;
+/**
+ * Loads the Google SDK on first use, never at import.
+ *
+ * The module calls `TurboModuleRegistry.getEnforcing` at its top level, which
+ * throws the moment it is imported into a runtime without the native side --
+ * Expo Go, most obviously. A static import here would put that throw in the
+ * root layout's provider chain and take the whole app down on boot, including
+ * the notes half, which has nothing to do with signing in.
+ *
+ * Deferring it means Expo Go runs everything except this one button.
+ */
+async function loadGoogle() {
+  const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
+  if (!googleConfigured) {
+    GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+    googleConfigured = true;
+  }
+  return GoogleSignin;
 }
 
 export async function signInWithGoogle(): Promise<AuthResult> {
   if (supabase === null || !canUseGoogle) return NOT_CONFIGURED;
 
   try {
-    configureGoogle();
+    const GoogleSignin = await loadGoogle();
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
     const response = await GoogleSignin.signIn();
@@ -148,7 +161,13 @@ export async function signOut(): Promise<void> {
   // Google keeps its own session. Leaving it signed in means the next tap
   // silently returns the same account with no chooser, which is not what
   // somebody who just signed out expects.
-  if (googleConfigured) await GoogleSignin.signOut().catch(() => null);
+  //
+  // Only if it was ever loaded: someone who signed in by email must not drag
+  // the native module into the runtime on their way out.
+  if (googleConfigured) {
+    const GoogleSignin = await loadGoogle();
+    await GoogleSignin.signOut().catch(() => null);
+  }
 }
 
 function isAppleCancellation(error: unknown): boolean {
