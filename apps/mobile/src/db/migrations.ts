@@ -189,6 +189,28 @@ const MIGRATIONS: readonly ((db: SQLiteDatabase) => Promise<void>)[] = [
       create index follows_followee_idx  on follows (followee_id);
     `);
   },
+
+  // v5 -- accounts.
+  //
+  // `social_identity` cached which local profile was "me". Real sign-in makes
+  // that a second answer to a question the session already answers, and the
+  // two could disagree after a token refresh or a sign-out elsewhere. The
+  // profile's primary key is now the account id, so "who am I" has exactly one
+  // source: the session.
+  //
+  // The table is dropped rather than backfilled. It only ever held a locally
+  // generated id that no account will ever match, and this ships before the
+  // first build anybody has installed.
+  async (db) => {
+    await db.execAsync(`
+      drop table if exists social_identity;
+      delete from profiles;
+      delete from feed_items;
+      delete from follows;
+      delete from reactions;
+      delete from blocks;
+    `);
+  },
 ];
 
 /**

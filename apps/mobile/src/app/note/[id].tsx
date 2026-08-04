@@ -256,11 +256,24 @@ function Editor({ note }: { note: Note | null }) {
 
       const problem = shareError(current);
       if (problem !== null) {
+        // Two of these are fixable in one tap, so they get a button rather
+        // than an instruction to go and find the right screen.
+        const route =
+          problem === 'Sign in to publish.'
+            ? '/sign-in'
+            : problem === 'Claim a handle first.'
+              ? '/handle'
+              : null;
+
         Alert.alert(
-          'Not this one',
-          problem === 'Claim a handle first.'
-            ? 'Pick a handle on the Feed tab before publishing anything.'
-            : problem,
+          route === null ? 'Not this one' : 'Almost',
+          problem,
+          route === null
+            ? undefined
+            : [
+                { text: 'Not now', style: 'cancel' },
+                { text: 'Continue', onPress: () => router.push(route) },
+              ],
         );
         return;
       }
@@ -284,7 +297,7 @@ function Editor({ note }: { note: Note | null }) {
         ],
       );
     })();
-  }, [requireSaved, repo, shareError, publish]);
+  }, [requireSaved, repo, shareError, publish, router]);
 
   const confirmUnshare = useCallback(() => {
     setSheet(null);

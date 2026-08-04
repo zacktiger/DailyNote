@@ -4,6 +4,16 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { newId } from './notes-repo';
 
 /**
+ * Reads the signed-in account id, or null.
+ *
+ * Passed in rather than read from a table because the session is owned by
+ * Supabase and can change under the app at any time -- a token refresh, a sign
+ * out on another device. Holding a copy in SQLite would mean two answers to
+ * "who am I" and a way for them to disagree.
+ */
+export type CurrentUserId = () => string | null;
+
+/**
  * All social persistence goes through here.
  *
  * Same contract as `notes-repo`: every read path in the social layer is one of
@@ -19,9 +29,10 @@ import { newId } from './notes-repo';
  */
 export interface SocialRepo {
   // --- identity ---
-  /** The profile this device posts as, or null before a handle is claimed. */
+  /** The signed-in account's profile, or null when signed out or unclaimed. */
   me(): Promise<Profile | null>;
-  claim(handle: string, displayName: string | null): Promise<Profile>;
+  /** Claims a handle for the signed-in account. Null when signed out. */
+  claim(handle: string, displayName: string | null): Promise<Profile | null>;
   updateMe(patch: ProfilePatch): Promise<Profile | null>;
   profile(id: string): Promise<Profile | null>;
   profileByHandle(handle: string): Promise<Profile | null>;
@@ -158,29 +169,31 @@ const ITEM_SELECT = `
     join profiles p on p.id = f.author_id
 `;
 
-export function createSocialRepo(db: SQLiteDatabase): SocialRepo {
-  /** The reader's id, or a sentinel that matches nothing before a handle exists. */
-  async function myId(): Promise<string> {
-    const row = await db.getFirstAsync<{ profile_id: string }>(
-      'select profile_id from social_identity where id = 1',
-    );
-    return row?.profile_id ?? '';
+export function createSocialRepo(db: SQLiteDatabase, currentUserId: CurrentUserId): SocialRepo {
+  /** The reader's id, or a sentinel that matches no row when signed out. */
+  function myId(): string {
+    return currentUserId() ?? '';
   }
 
   return {
     async me() {
-      const row = await db.getFirstAsync<ProfileRow>(
-        `select p.* from profiles p
-           join social_identity s on s.profile_id = p.id
-          where s.id = 1`,
-      );
+      const id = myId();
+      if (id === '') return null;
+
+      const row = await db.getFirstAsync<ProfileRow>('select * from profiles where id = ?', id);
       return row ? toProfile(row) : null;
     },
 
     async claim(handle, displayName) {
+      // The profile *is* the account, keyed by the same id. There is no path
+      // to a second identity on one account, and no local id to reconcile
+      // against the server later.
+      const id = myId();
+      if (id === '') return null;
+
       const now = new Date().toISOString();
       const profile: Profile = {
-        id: newId(),
+        id,
         handle,
         displayName,
         bio: null,
@@ -188,25 +201,17 @@ export function createSocialRepo(db: SQLiteDatabase): SocialRepo {
         createdAt: now,
       };
 
-      await db.withTransactionAsync(async () => {
-        await db.runAsync(
-          `insert into profiles
-             (id, handle, display_name, bio, avatar_url, created_at, updated_at)
-           values (?, ?, ?, null, null, ?, ?)`,
-          [profile.id, profile.handle, profile.displayName, now, now],
-        );
-        // The check on `id = 1` makes a second identity a constraint error
-        // rather than a silently split account.
-        await db.runAsync('insert into social_identity (id, profile_id) values (1, ?)', [
-          profile.id,
-        ]);
-      });
+      await db.runAsync(
+        `insert into profiles (id, handle, display_name, bio, avatar_url, created_at, updated_at)
+         values (?, ?, ?, null, null, ?, ?)`,
+        [profile.id, profile.handle, profile.displayName, now, now],
+      );
 
       return profile;
     },
 
     async updateMe(patch) {
-      const id = await myId();
+      const id = myId();
       if (id === '') return null;
 
       const columns: Record<keyof ProfilePatch, string> = {
@@ -274,14 +279,14 @@ export function createSocialRepo(db: SQLiteDatabase): SocialRepo {
     async items() {
       const rows = await db.getAllAsync<ItemRow>(
         `${ITEM_SELECT} order by f.active_at desc`,
-        await myId(),
+        myId(),
       );
       return rows.map(toItem);
     },
 
     async item(id) {
       const row = await db.getFirstAsync<ItemRow>(`${ITEM_SELECT} where f.id = ?`, [
-        await myId(),
+        myId(),
         id,
       ]);
       return row ? toItem(row) : null;
@@ -290,7 +295,7 @@ export function createSocialRepo(db: SQLiteDatabase): SocialRepo {
     async byAuthor(authorId) {
       const rows = await db.getAllAsync<ItemRow>(
         `${ITEM_SELECT} where f.author_id = ? order by f.active_at desc`,
-        [await myId(), authorId],
+        [myId(), authorId],
       );
       return rows.map(toItem);
     },
@@ -349,13 +354,13 @@ export function createSocialRepo(db: SQLiteDatabase): SocialRepo {
     async following() {
       const rows = await db.getAllAsync<{ followee_id: string }>(
         'select followee_id from follows where follower_id = ?',
-        await myId(),
+        myId(),
       );
       return new Set(rows.map((row) => row.followee_id));
     },
 
     async setFollowing(authorId, following) {
-      const id = await myId();
+      const id = myId();
       if (id === '' || id === authorId) return;
 
       if (following) {
@@ -385,7 +390,7 @@ export function createSocialRepo(db: SQLiteDatabase): SocialRepo {
     },
 
     async setLiked(itemId, liked) {
-      const id = await myId();
+      const id = myId();
       if (id === '') return;
 
       if (liked) {
@@ -400,7 +405,7 @@ export function createSocialRepo(db: SQLiteDatabase): SocialRepo {
     },
 
     async blocked() {
-      const id = await myId();
+      const id = myId();
       const rows = await db.getAllAsync<{ blocker_id: string; blocked_id: string }>(
         'select blocker_id, blocked_id from blocks where blocker_id = ? or blocked_id = ?',
         [id, id],
@@ -416,7 +421,7 @@ export function createSocialRepo(db: SQLiteDatabase): SocialRepo {
     },
 
     async setBlocked(authorId, blocked) {
-      const id = await myId();
+      const id = myId();
       if (id === '' || id === authorId) return;
 
       if (blocked) {
@@ -443,7 +448,7 @@ export function createSocialRepo(db: SQLiteDatabase): SocialRepo {
     },
 
     async report(itemId, reason) {
-      const id = await myId();
+      const id = myId();
       await db.runAsync(
         `insert into reports (id, reporter_id, note_id, reason, status, created_at)
          values (?, ?, ?, ?, 'open', ?)`,

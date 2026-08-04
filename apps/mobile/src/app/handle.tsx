@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/icon';
 import { haptics } from '@/lib/haptics';
 import { useGoBack } from '@/lib/nav';
+import { useAuth } from '@/store/auth-store';
 import { useSocial } from '@/store/social-store';
 import { useTheme } from '@/theme';
 
@@ -31,6 +32,7 @@ export default function ClaimHandle() {
   const router = useRouter();
   const goBack = useGoBack();
   const { me, claim } = useSocial();
+  const { userId } = useAuth();
 
   const [handle, setHandle] = useState('');
   const [name, setName] = useState('');
@@ -62,6 +64,23 @@ export default function ClaimHandle() {
       router.replace({ pathname: '/profile/[handle]', params: { handle: normalized } });
     })();
   }, [ready, claim, normalized, name, router]);
+
+  // Reachable by deep link, or by signing out with this screen still on the
+  // stack. A handle belongs to an account, so there is nothing to claim yet.
+  if (userId === null) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center bg-canvas dark:bg-canvas-dark">
+        <Text className="text-[17px] text-muted dark:text-muted-dark">Sign in first.</Text>
+        <Pressable
+          onPress={() => router.replace('/sign-in')}
+          className="mt-4 active:opacity-60"
+          accessibilityRole="button"
+        >
+          <Text className="text-[15px] font-medium text-accent dark:text-accent-dark">Sign in</Text>
+        </Pressable>
+      </SafeAreaView>
+    );
+  }
 
   if (me !== null) {
     return (
