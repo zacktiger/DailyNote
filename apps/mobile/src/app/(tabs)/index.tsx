@@ -91,7 +91,7 @@ export default function NotesList() {
           onPress={openSearch}
           tint={searching ? theme.accent : theme.ink}
         />
-        <IconButton name="overflow" label="More" onPress={() => router.push('/notebooks')} />
+        <IconButton name="overflow" label="Notebooks" onPress={() => router.push('/notebooks')} />
       </View>
 
       <Animated.FlatList
