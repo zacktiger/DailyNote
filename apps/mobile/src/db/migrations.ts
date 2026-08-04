@@ -51,6 +51,15 @@ const MIGRATIONS: readonly ((db: SQLiteDatabase) => Promise<void>)[] = [
       create index notes_root_idx    on notes (root_id);
     `);
   },
+
+  // v2 -- the block document behind rich text.
+  //
+  // Nullable with no backfill: a null `doc` is a plain-text note, which the
+  // client reads as a document of paragraphs. `body` remains the plain-text
+  // projection, so every existing read path is untouched.
+  async (db) => {
+    await db.execAsync('alter table notes add column doc text;');
+  },
 ];
 
 /**

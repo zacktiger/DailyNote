@@ -1,25 +1,27 @@
-import { threadOf, type Note } from '@dailynote/core';
+import { parseDocument, threadOf, type Block, type Note } from '@dailynote/core';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
+import { BlockEditor } from '@/components/block-editor';
 import { comesBack, formatDay } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import * as motion from '@/lib/motion';
 import { AnimatedPressable } from '@/lib/motion';
 import { useNotes } from '@/store/notes-store';
-import { useTheme } from '@/theme';
 
-/** Note detail: edit the body, promote to a commitment, read the thread. */
+/** How long the writing has to stop before an edit is written to SQLite. */
+const AUTOSAVE_MS = 600;
+
+/** Note detail: edit the note, promote to a commitment, read the thread. */
 export default function NoteDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { notes } = useNotes();
@@ -36,17 +38,54 @@ export default function NoteDetail() {
     );
   }
 
-  // Keyed on the note id so the draft initialises from the stored body once,
-  // on mount, rather than being synced back by an effect -- store refreshes
-  // must never clobber what the user is currently typing.
+  // Keyed on the note id so the draft initialises from storage once, on mount,
+  // rather than being synced back by an effect -- store refreshes must never
+  // clobber what the user is currently typing.
   return <NoteEditor key={note.id} note={note} />;
 }
 
 function NoteEditor({ note }: { note: Note }) {
-  const theme = useTheme();
   const router = useRouter();
-  const { notes, setBody, softDelete, promote } = useNotes();
-  const [draft, setDraft] = useState(note.body);
+  const { notes, setContent, softDelete, promote } = useNotes();
+  const [blocks, setBlocks] = useState<Block[]>(() => parseDocument(note.doc, note.body));
+
+  // Autosave, because there is no longer one input whose blur means "done":
+  // with a block per line, blur fires every time the caret moves between them.
+  // So the note is written once the writing pauses, and again on the way out.
+  const latest = useRef(blocks);
+  const unsaved = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flush = useCallback(() => {
+    if (!unsaved.current) return;
+    unsaved.current = false;
+    void setContent(note.id, latest.current);
+  }, [note.id, setContent]);
+
+  // Kept in a ref so the unmount effect below can stay on empty deps. `flush`
+  // closes over `setContent`, whose identity changes on every store refresh --
+  // an effect depending on it would re-run its cleanup, and saving from a
+  // cleanup that fires on every save is a loop.
+  const flushRef = useRef(flush);
+  useEffect(() => {
+    flushRef.current = flush;
+  });
+
+  useEffect(() => {
+    return () => {
+      if (timer.current !== null) clearTimeout(timer.current);
+      flushRef.current();
+    };
+  }, []);
+
+  const change = useCallback((next: Block[]) => {
+    setBlocks(next);
+    latest.current = next;
+    unsaved.current = true;
+
+    if (timer.current !== null) clearTimeout(timer.current);
+    timer.current = setTimeout(() => flushRef.current(), AUTOSAVE_MS);
+  }, []);
 
   const updates = useMemo(
     () => threadOf(notes, note.rootId).filter((candidate) => candidate.id !== note.id),
@@ -78,22 +117,16 @@ function NoteEditor({ note }: { note: Note }) {
         }}
       />
 
-      <ScrollView contentContainerClassName="pb-10" keyboardDismissMode="on-drag">
-        <Text className="pt-1 text-center text-xs text-faint dark:text-faint-dark">
+      <ScrollView
+        contentContainerClassName="pb-10 pt-3"
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text className="pb-3 text-center text-xs text-faint dark:text-faint-dark">
           {formatDay(note.createdAt)}
         </Text>
 
-        <TextInput
-          value={draft}
-          onChangeText={setDraft}
-          onBlur={() => {
-            if (draft !== note.body) void setBody(note.id, draft);
-          }}
-          multiline
-          textAlignVertical="top"
-          className="min-h-[220px] px-5 pt-3 font-serif text-[21px] leading-8 text-ink web:outline-none dark:text-ink-dark"
-          selectionColor={theme.accent}
-        />
+        <BlockEditor blocks={blocks} onChange={change} placeholder="Untitled" />
 
         {/* The follow-through loop's entry point. Promoting crossfades the
             pill into the status with a spring reflow and the app's single
