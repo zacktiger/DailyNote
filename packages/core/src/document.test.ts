@@ -7,6 +7,7 @@ import {
   paragraph,
   parseDocument,
   serializeDocument,
+  setAlign,
   toggleBullet,
   type Block,
 } from './document';
@@ -148,6 +149,35 @@ describe('toggleBullet', () => {
     toggleBullet(blocks, 0);
 
     expect(blocks[0]!.type).toBe('paragraph');
+  });
+});
+
+describe('setAlign', () => {
+  it('aligns one block and leaves the others', () => {
+    const blocks = [paragraph('Groceries'), paragraph('milk')];
+
+    expect(setAlign(blocks, 0, 'center').map((block) => block.align)).toEqual(['center', 'left']);
+  });
+
+  it('aligns an image too', () => {
+    expect(setAlign([image('attachments/a.jpg', 10, 10)], 0, 'right')[0]!.align).toBe('right');
+  });
+
+  it('survives the round trip through storage', () => {
+    const aligned = setAlign([paragraph('centred')], 0, 'center');
+
+    expect(parseDocument(serializeDocument(aligned), '')[0]!.align).toBe('center');
+  });
+
+  it('is a no-op for an index that is not there', () => {
+    expect(setAlign([paragraph('a')], 4, 'right')[0]!.align).toBe('left');
+  });
+
+  it('does not mutate the document it was given', () => {
+    const blocks = [paragraph('a')];
+    setAlign(blocks, 0, 'right');
+
+    expect(blocks[0]!.align).toBe('left');
   });
 });
 

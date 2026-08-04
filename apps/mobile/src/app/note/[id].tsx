@@ -1,4 +1,11 @@
-import { parseDocument, threadOf, toggleBullet, type Block, type Note } from '@dailynote/core';
+import {
+  parseDocument,
+  setAlign,
+  threadOf,
+  toggleBullet,
+  type Block,
+  type Note,
+} from '@dailynote/core';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -202,6 +209,11 @@ function NoteEditor({ note }: { note: Note }) {
           change(toggleBullet(blocks, focused));
           // The toolbar took the tap; give the caret straight back so the
           // keyboard never drops and the next word goes where it should.
+          editor.current?.restoreFocus();
+        }}
+        onAlign={(align) => {
+          if (focused === null) return;
+          change(setAlign(blocks, focused, align));
           editor.current?.restoreFocus();
         }}
       />

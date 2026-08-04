@@ -5,6 +5,7 @@ import {
   paragraph,
   parseHashtags,
   serializeDocument,
+  setAlign,
   toggleBullet,
   type Block,
 } from '@dailynote/core';
@@ -223,6 +224,11 @@ export default function Composer() {
               setBlocks(toggleBullet(blocks, focused));
               // The toolbar took the tap; give the caret straight back so the
               // keyboard never drops and the next word goes where it should.
+              editor.current?.restoreFocus();
+            }}
+            onAlign={(align) => {
+              if (focused === null) return;
+              setBlocks(setAlign(blocks, focused, align));
               editor.current?.restoreFocus();
             }}
           />

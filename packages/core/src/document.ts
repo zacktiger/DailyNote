@@ -192,6 +192,21 @@ export function toggleBullet(blocks: readonly Block[], index: number): Block[] {
   return next;
 }
 
+/**
+ * Aligns the block at `index`.
+ *
+ * Applies to images as well as text -- a centred photo is the common case --
+ * and is a no-op for an index that is not there.
+ */
+export function setAlign(blocks: readonly Block[], index: number, align: Align): Block[] {
+  const block = blocks[index];
+  if (block === undefined) return [...blocks];
+
+  const next = [...blocks];
+  next[index] = { ...block, align };
+  return next;
+}
+
 /** True when there is nothing worth saving: no image, and no non-blank text. */
 export function isEmptyDocument(blocks: readonly Block[]): boolean {
   return blocks.every((block) => isTextBlock(block) && block.text.trim().length === 0);

@@ -261,6 +261,10 @@ export function BlockEditor({
               numberOfLines={Platform.OS === 'web' ? 1 : undefined}
               // The screen owns scrolling; a block sizes to its own content.
               scrollEnabled={false}
+              // The input spans the row, so aligning its text aligns the line,
+              // and the caret follows it to the same edge. A style rather than
+              // the same-named prop, which react-native-web does not forward.
+              style={{ textAlign: block.align }}
               textAlignVertical="top"
               placeholder={isTitle ? placeholder : undefined}
               placeholderTextColor={theme.faint}

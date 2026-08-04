@@ -1,5 +1,6 @@
-import { isTextBlock, type Block } from '@dailynote/core';
-import { Pressable, Text } from 'react-native';
+import { isTextBlock, type Align, type Block } from '@dailynote/core';
+import type { ReactNode } from 'react';
+import { Pressable, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { haptics } from '@/lib/haptics';
@@ -13,15 +14,25 @@ import * as motion from '@/lib/motion';
  * the thing on screen, and this is a thin strip under it.
  */
 
+const ALIGNMENTS: readonly Align[] = ['left', 'center', 'right'];
+
+/** Which edge an alignment icon's short bars sit against. */
+const ICON_EDGE: Record<Align, 'flex-start' | 'center' | 'flex-end'> = {
+  left: 'flex-start',
+  center: 'center',
+  right: 'flex-end',
+};
+
 export interface BlockToolbarProps {
   /** The focused block, or undefined when nothing is. */
   block: Block | undefined;
   onToggleBullet: () => void;
+  onAlign: (align: Align) => void;
 }
 
-export function BlockToolbar({ block, onToggleBullet }: BlockToolbarProps) {
-  // Nothing to format when the caret is nowhere, or sitting on an image.
-  if (block === undefined || !isTextBlock(block)) return null;
+export function BlockToolbar({ block, onToggleBullet, onAlign }: BlockToolbarProps) {
+  // Nothing to format when the caret is nowhere at all.
+  if (block === undefined) return null;
 
   return (
     <Animated.View
@@ -29,17 +40,56 @@ export function BlockToolbar({ block, onToggleBullet }: BlockToolbarProps) {
       exiting={motion.exit}
       className="flex-row items-center gap-1 border-t border-line/60 bg-paper px-3 py-2 dark:border-line-dark/60 dark:bg-paper-dark"
     >
-      <ToolbarButton label="•  List" active={block.type === 'bullet'} onPress={onToggleBullet} />
+      {isTextBlock(block) ? (
+        <ToolbarButton active={block.type === 'bullet'} onPress={onToggleBullet}>
+          <Text
+            className={
+              block.type === 'bullet'
+                ? 'text-[13px] font-medium text-accent dark:text-accent-dark'
+                : 'text-[13px] font-medium text-muted dark:text-muted-dark'
+            }
+          >
+            •&nbsp;&nbsp;List
+          </Text>
+        </ToolbarButton>
+      ) : null}
+
+      {ALIGNMENTS.map((align) => (
+        <ToolbarButton key={align} active={block.align === align} onPress={() => onAlign(align)}>
+          <AlignIcon align={align} active={block.align === align} />
+        </ToolbarButton>
+      ))}
     </Animated.View>
   );
 }
 
+/**
+ * Three stacked bars, the short ones pushed to the edge the text will go to.
+ *
+ * Drawn rather than set in a font: the app ships no icon set, and the shape is
+ * four rectangles.
+ */
+function AlignIcon({ align, active }: { align: Align; active: boolean }) {
+  const bar = active
+    ? 'h-[1.5px] rounded-full bg-accent dark:bg-accent-dark'
+    : 'h-[1.5px] rounded-full bg-muted dark:bg-muted-dark';
+
+  return (
+    <View className="w-4 gap-[3px]" style={{ alignItems: ICON_EDGE[align] }}>
+      <View className={`w-full ${bar}`} />
+      <View className={`w-2/3 ${bar}`} />
+      <View className={`w-full ${bar}`} />
+      <View className={`w-2/3 ${bar}`} />
+    </View>
+  );
+}
+
 function ToolbarButton({
-  label,
+  children,
   active,
   onPress,
 }: {
-  label: string;
+  children: ReactNode;
   active: boolean;
   onPress: () => void;
 }) {
@@ -56,15 +106,7 @@ function ToolbarButton({
           : 'rounded-full px-3 py-1.5 active:opacity-60'
       }
     >
-      <Text
-        className={
-          active
-            ? 'text-[13px] font-medium text-accent dark:text-accent-dark'
-            : 'text-[13px] font-medium text-muted dark:text-muted-dark'
-        }
-      >
-        {label}
-      </Text>
+      {children}
     </Pressable>
   );
 }
